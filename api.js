@@ -186,8 +186,18 @@ function createLiveApi(supabase) {
       return data;
     },
 
-    async postAnnouncement(message) {
-      const { error } = await supabase.from('announcements').insert({ message, created_by: await currentUserId() });
+    async postAnnouncement({ message, style, title }) {
+      const row = { message, created_by: await currentUserId() };
+      if (style && style !== 'banner') row.style = style;
+      if (title) row.title = title;
+      const { error } = await supabase.from('announcements').insert(row);
+      if (error && /style|title/i.test(error.message) && /column/i.test(error.message)) throw new Error('Draai eerst spark-extra.sql in Supabase.');
+      fail(error);
+    },
+
+    async deleteUser(id) {
+      const { error } = await supabase.rpc('admin_delete_user', { p_user_id: id });
+      if (error && /admin_delete_user/i.test(error.message)) throw new Error('Draai eerst spark-extra.sql in Supabase.');
       fail(error);
     },
 
@@ -378,10 +388,18 @@ function createDemoApi() {
       return clone(announcements).sort((a, b) => b.created_at.localeCompare(a.created_at));
     },
 
-    async postAnnouncement(message) {
+    async postAnnouncement({ message, style, title }) {
       await wait();
-      announcements.unshift({ id: id(), message, active: true, created_at: new Date().toISOString() });
+      announcements.unshift({ id: id(), message, style: style || 'banner', title, active: true, created_at: new Date().toISOString() });
       addLog('Melding geplaatst', message.slice(0, 80));
+    },
+
+    async deleteUser(userId) {
+      await wait();
+      const u = users.find(x => x.id === userId);
+      if (u.is_admin) throw new Error('Neem eerst de beheerdersrechten af voordat je dit account verwijdert');
+      users = users.filter(x => x.id !== userId);
+      addLog('Account verwijderd', '@' + u.username);
     },
 
     async setAnnouncementActive(annId, active) {

@@ -542,6 +542,8 @@ function openUserDialog(u) {
       <div class="list-item"><div class="who-block"><span class="s">Status</span><span class="t">${u.is_blocked ? 'Geblokkeerd' : 'Actief'}${u.is_admin ? ' · Beheerder' : ''}</span></div></div>
     </div>
     <div class="dlg-foot">
+      ${u.is_admin || u.username === state.me?.username ? '' : `<button type="button" class="btn btn-danger" data-action="delete-user" data-id="${esc(u.id)}">Account verwijderen</button>`}
+      <span style="flex:1"></span>
       <button type="button" class="btn" data-action="reset-pw" data-id="${esc(u.id)}">Wachtwoord-reset mailen</button>
     </div>`;
   $('#dlg-user').showModal();
@@ -552,18 +554,34 @@ function openUserDialog(u) {
 // =============================================================
 function announcementForm(prefix) {
   return `
-    <form class="ann-form" data-form="announcement" novalidate style="display:flex;flex-direction:column;gap:10px">
+    <form class="ann-form" data-form="announcement" novalidate style="display:flex;flex-direction:column;gap:12px">
+      <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px">
+        <legend style="font-size:14px;font-weight:500;padding:0;margin-bottom:8px">Hoe tonen?</legend>
+        <div class="filters">
+          <label class="chip" style="display:inline-flex;align-items:center;gap:8px"><input type="radio" name="style" value="banner" checked> Balk bovenaan</label>
+          <label class="chip" style="display:inline-flex;align-items:center;gap:8px"><input type="radio" name="style" value="popup"> Pop-up op het hele scherm</label>
+        </div>
+      </fieldset>
+      <label class="field" data-popup-only hidden><span>Titel van de pop-up</span>
+        <input type="text" name="title" maxlength="60" placeholder="Bijv. Nieuwe app!">
+      </label>
       <label class="field" for="${prefix}-ann"><span>Bericht</span></label>
       <textarea id="${prefix}-ann" name="message" rows="3" maxlength="280" placeholder="Bijv. Nieuwe app: Henk Herstelt!"></textarea>
       <p class="error-text" data-error role="alert" hidden></p>
-      <div class="row"><button type="submit" class="btn btn-primary">Plaatsen</button><small style="color:var(--muted)">Max. 280 tekens</small></div>
+      <div class="row"><button type="submit" class="btn btn-primary">Plaatsen</button><small style="color:var(--muted)">Max. 280 tekens. Een pop-up ziet iedereen één keer.</small></div>
     </form>`;
 }
+
+document.addEventListener('change', e => {
+  if (e.target.name !== 'style') return;
+  const form = e.target.closest('[data-form=announcement]');
+  if (form) $('[data-popup-only]', form).hidden = e.target.value !== 'popup';
+});
 
 async function renderAnnouncements(el) {
   const items = await api.listAnnouncements();
   el.innerHTML = `
-    <header class="page-head"><div><h1>Meldingen</h1><p class="lead">Berichten bovenaan in de Spark-appstore.</p></div></header>
+    <header class="page-head"><div><h1>Meldingen</h1><p class="lead">Berichten in de Spark-appstore: als balk bovenaan of als pop-up.</p></div></header>
     <section class="card" aria-labelledby="ann-new"><h2 id="ann-new">Nieuwe melding</h2>${announcementForm('page')}</section>
     <section class="card" aria-labelledby="ann-list">
       <h2 id="ann-list">Alle meldingen</h2>
@@ -571,8 +589,8 @@ async function renderAnnouncements(el) {
         ${items.map(a => `
           <div class="list-item">
             <div class="who-block">
-              <span class="t">${esc(a.message)}</span>
-              <span class="s">${fmtDate(a.created_at)}</span>
+              <span class="t">${a.title ? `<strong>${esc(a.title)}</strong> · ` : ''}${esc(a.message)}</span>
+              <span class="s">${a.style === 'popup' ? 'Pop-up' : 'Balk bovenaan'} · ${fmtDate(a.created_at)}</span>
             </div>
             <span class="pill ${a.active ? 'pill-live' : 'pill-verborgen'}">${a.active ? 'Zichtbaar' : 'Uit'}</span>
             <button type="button" class="btn btn-sm" data-action="toggle-ann" data-id="${esc(a.id)}" data-active="${a.active}">${a.active ? 'Uitzetten' : 'Weer aanzetten'}</button>
@@ -586,12 +604,15 @@ document.addEventListener('submit', async e => {
   if (!form) return;
   e.preventDefault();
   const message = form.message.value.trim();
+  const style = form.querySelector('[name=style]:checked').value;
+  const title = form.title.value.trim();
   if (!message) return showError(form, 'Typ eerst een bericht.');
   showError(form, '');
   await busy($('button[type=submit]', form), async () => {
     try {
-      await api.postAnnouncement(message);
+      await api.postAnnouncement({ message, style, title: style === 'popup' && title ? title : null });
       form.reset();
+      $('[data-popup-only]', form).hidden = true;
       toast('Melding geplaatst');
       refreshData();
     } catch (err) {
@@ -718,6 +739,16 @@ document.addEventListener('click', async e => {
       const ok = await confirmDialog(`@${u.username} goedkeuren?`, 'Het account wordt bevestigd alsof deze persoon op de link in de mail heeft geklikt. Daarna kan hij of zij meteen inloggen.', 'Goedkeuren');
       if (!ok) return;
       try { await api.confirmUser(id); toast(`@${u.username} goedgekeurd`); refreshData(); }
+      catch (err) { toast(err.message, true); }
+      break;
+    }
+
+    case 'delete-user': {
+      const u = state.users.find(x => x.id === id);
+      $('#dlg-user').close();
+      const ok = await confirmDialog(`@${u.username} verwijderen?`, 'Het account en het profiel worden definitief verwijderd. Dit kun je niet terugdraaien. Wil je iemand alleen tegenhouden? Kies dan Blokkeren.', 'Verwijderen');
+      if (!ok) return;
+      try { await api.deleteUser(id); toast(`@${u.username} verwijderd`); refreshData(); }
       catch (err) { toast(err.message, true); }
       break;
     }
