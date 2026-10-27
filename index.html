@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0E1116">
+<title>Spark Beheer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Laden -->
+<div id="boot" class="login" aria-live="polite">
+  <p style="color:#9AA1B2">Spark Beheer laden…</p>
+</div>
+
+<!-- Inlogscherm -->
+<main id="login" class="login" hidden>
+  <div class="login-card">
+    <div class="login-brand">
+      <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z" fill="#2F4BFF"/></svg>
+      <div>
+        <div class="name">Spark Beheer</div>
+        <div class="sub">Alleen voor beheerders</div>
+      </div>
+    </div>
+    <div id="login-demo" class="banner" hidden>
+      <span><strong>Demo-stand.</strong> Er is nog geen database gekoppeld. Klik op Inloggen om rond te kijken met voorbeeldgegevens.</span>
+    </div>
+    <form id="login-form" novalidate>
+      <label class="field">
+        <span>E-mail</span>
+        <input type="email" name="email" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Wachtwoord</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="error-text" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary">Inloggen</button>
+    </form>
+    <p class="hint">Log in met je Spark Account. Alleen accounts met beheerdersrechten komen binnen.</p>
+  </div>
+</main>
+
+<!-- De app -->
+<div id="app" class="shell" hidden>
+  <aside class="side">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C13 8 16 11 24 12C16 13 13 16 12 24C11 16 8 13 0 12C8 11 11 8 12 0Z" fill="#2F4BFF"/></svg>
+      <div>
+        <div class="name">Spark</div>
+        <div class="sub">Beheer</div>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Hoofdmenu">
+      <a href="#overzicht" data-route="overzicht">Overzicht</a>
+      <a href="#apps" data-route="apps">Apps <span class="count" id="count-apps"></span></a>
+      <a href="#gebruikers" data-route="gebruikers">Gebruikers <span class="count" id="count-users"></span></a>
+      <a href="#meldingen" data-route="meldingen">Meldingen</a>
+      <a href="#logboek" data-route="logboek">Logboek</a>
+      <a href="#server" data-route="server">Server</a>
+    </nav>
+    <div class="side-foot">
+      <span class="lbl">Ingelogd als</span>
+      <span class="who" id="me-name"></span>
+      <span class="mode-pill" id="mode-pill" hidden>Demo-stand</span>
+      <button type="button" class="btn-link" data-action="logout">Uitloggen</button>
+    </div>
+  </aside>
+  <main class="main" id="view" tabindex="-1"></main>
+</div>
+
+<!-- Dialoog: app toevoegen / bewerken -->
+<dialog id="dlg-app" aria-labelledby="dlg-app-title">
+  <form class="dlg" method="dialog" id="form-app" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-app-title">Nieuwe app</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" name="id">
+    <input type="hidden" name="icon_url">
+    <div class="form-grid">
+      <label class="field">
+        <span>Naam</span>
+        <input type="text" name="name" maxlength="60" required>
+      </label>
+      <label class="field">
+        <span>Korte naam (slug)</span>
+        <input type="text" name="slug" maxlength="40" pattern="[a-z0-9-]{2,40}" required>
+        <small>Kleine letters, cijfers en -</small>
+      </label>
+    </div>
+    <label class="field">
+      <span>Ondertitel</span>
+      <input type="text" name="tagline" maxlength="80" placeholder="Eén zin over de app">
+    </label>
+    <label class="field">
+      <span>Beschrijving</span>
+      <textarea name="description" rows="3" maxlength="2000"></textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Status</span>
+        <select name="status">
+          <option value="concept">Concept (niet zichtbaar)</option>
+          <option value="live">Live (in de store)</option>
+          <option value="verborgen">Verborgen</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Volgorde</span>
+        <input type="number" name="sort_order" min="0" step="1" value="0">
+      </label>
+    </div>
+    <div class="row">
+      <label class="field">
+        <span>Kleur</span>
+        <input type="color" name="color" value="#2F4BFF">
+      </label>
+      <label class="field grow">
+        <span>Icoon (PNG, JPG, WEBP of SVG, max 1 MB)</span>
+        <input type="file" name="icon" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+      </label>
+    </div>
+    <p class="error-text" data-error role="alert" hidden></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-danger" data-action="delete-app" hidden>Verwijderen</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" data-close>Annuleren</button>
+      <button type="submit" class="btn btn-primary">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialoog: nieuwe versie publiceren -->
+<dialog id="dlg-version" aria-labelledby="dlg-version-title">
+  <form class="dlg" method="dialog" id="form-version" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-version-title">Update publiceren</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lead" id="dlg-version-lead" style="color:var(--muted)"></p>
+    <div class="form-grid">
+      <label class="field">
+        <span>Versie</span>
+        <input type="text" name="version_name" maxlength="20" placeholder="1.2.0" required>
+        <small>Zoals gebruikers hem zien</small>
+      </label>
+      <label class="field">
+        <span>Versiecode</span>
+        <input type="number" name="version_code" min="1" step="1" required>
+        <small>Altijd hoger dan de vorige</small>
+      </label>
+    </div>
+    <label class="field">
+      <span>Wat is er nieuw?</span>
+      <textarea name="changelog" rows="3" maxlength="1000"></textarea>
+    </label>
+    <label class="field">
+      <span>APK-bestand</span>
+      <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required>
+      <small>Altijd ondertekend met dezelfde sleutel als de vorige versie</small>
+    </label>
+    <p class="error-text" data-error role="alert" hidden></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close>Annuleren</button>
+      <button type="submit" class="btn btn-primary">Publiceren</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialoog: gebruiker bekijken -->
+<dialog id="dlg-user" aria-labelledby="dlg-user-title">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h2 id="dlg-user-title">Gebruiker</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="dlg-user-body"></div>
+  </div>
+</dialog>
+
+<!-- Dialoog: bevestigen -->
+<dialog id="dlg-confirm" aria-labelledby="dlg-confirm-title">
+  <form class="dlg" method="dialog">
+    <h2 id="dlg-confirm-title">Weet je het zeker?</h2>
+    <p id="dlg-confirm-text"></p>
+    <div class="dlg-foot">
+      <button type="submit" value="cancel" class="btn">Annuleren</button>
+      <button type="submit" value="ok" class="btn btn-danger" id="dlg-confirm-ok">Ja</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
