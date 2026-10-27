@@ -481,9 +481,10 @@ function userRow(u) {
     <div class="list-item">
       ${avatar(u)}
       <div class="who-block">
-        <span class="t">${esc(u.display_name)} ${u.is_admin ? '<span class="pill pill-admin">Beheerder</span>' : ''} ${u.is_blocked ? '<span class="pill pill-blocked">Geblokkeerd</span>' : ''}</span>
+        <span class="t">${esc(u.display_name)} ${u.is_admin ? '<span class="pill pill-admin">Beheerder</span>' : ''} ${u.is_blocked ? '<span class="pill pill-blocked">Geblokkeerd</span>' : ''} ${u.email_confirmed_at ? '' : '<span class="pill pill-concept">Niet bevestigd</span>'}</span>
         <span class="s">@${esc(u.username)} · lid sinds ${fmtDate(u.created_at)}</span>
       </div>
+      ${u.email_confirmed_at ? '' : `<button type="button" class="btn btn-sm btn-primary" data-action="confirm-user" data-id="${esc(u.id)}">Goedkeuren</button>`}
       <button type="button" class="btn btn-sm" data-action="view-user" data-id="${esc(u.id)}">Bekijken</button>
       ${isMe ? '' : u.is_blocked
         ? `<button type="button" class="btn btn-sm" data-action="unblock" data-id="${esc(u.id)}">Deblokkeren</button>`
@@ -499,9 +500,9 @@ async function renderUsers(el) {
 function drawUsers(el) {
   const q = state.userSearch.toLowerCase();
   const list = state.users.filter(u =>
-    (state.userFilter === 'alle' || (state.userFilter === 'geblokkeerd' ? u.is_blocked : u.is_admin)) &&
+    (state.userFilter === 'alle' || (state.userFilter === 'geblokkeerd' ? u.is_blocked : state.userFilter === 'wachtend' ? !u.email_confirmed_at : u.is_admin)) &&
     (!q || u.username.toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)));
-  const counts = { alle: state.users.length, geblokkeerd: state.users.filter(u => u.is_blocked).length, beheerders: state.users.filter(u => u.is_admin).length };
+  const counts = { alle: state.users.length, wachtend: state.users.filter(u => !u.email_confirmed_at).length, geblokkeerd: state.users.filter(u => u.is_blocked).length, beheerders: state.users.filter(u => u.is_admin).length };
 
   el.innerHTML = `
     <header class="page-head">
@@ -510,7 +511,7 @@ function drawUsers(el) {
     <section class="card" aria-label="Lijst met gebruikers">
       <div class="card-head">
         <div class="filters" role="group" aria-label="Filter gebruikers">
-          ${[['alle', 'Alle'], ['geblokkeerd', 'Geblokkeerd'], ['beheerders', 'Beheerders']].map(([v, l]) => `
+          ${[['alle', 'Alle'], ['wachtend', 'Niet bevestigd'], ['geblokkeerd', 'Geblokkeerd'], ['beheerders', 'Beheerders']].map(([v, l]) => `
             <button type="button" class="chip" data-action="user-filter" data-value="${v}" aria-pressed="${state.userFilter === v}">${l} (${counts[v]})</button>`).join('')}
         </div>
         <label style="flex:0 1 280px"><span class="sr-only">Zoek een gebruiker</span>
@@ -537,7 +538,11 @@ function openUserDialog(u) {
       <div class="list-item"><div class="who-block"><span class="s">E-mail</span><span class="t">${esc(u.email || '—')}</span></div></div>
       <div class="list-item"><div class="who-block"><span class="s">Lid sinds</span><span class="t">${fmtDate(u.created_at)}</span></div></div>
       <div class="list-item"><div class="who-block"><span class="s">Laatst ingelogd</span><span class="t">${fmtDate(u.last_sign_in_at)}</span></div></div>
+      <div class="list-item"><div class="who-block"><span class="s">E-mail bevestigd</span><span class="t">${u.email_confirmed_at ? fmtDate(u.email_confirmed_at) : 'Nog niet'}</span></div></div>
       <div class="list-item"><div class="who-block"><span class="s">Status</span><span class="t">${u.is_blocked ? 'Geblokkeerd' : 'Actief'}${u.is_admin ? ' · Beheerder' : ''}</span></div></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-action="reset-pw" data-id="${esc(u.id)}">Wachtwoord-reset mailen</button>
     </div>`;
   $('#dlg-user').showModal();
 }
@@ -704,6 +709,22 @@ document.addEventListener('click', async e => {
       const ok = await confirmDialog(`@${u.username} blokkeren?`, 'Deze persoon kan dan niet meer inloggen in de Spark-apps. Je kunt dit altijd terugdraaien.', 'Blokkeren');
       if (!ok) return;
       try { await api.setBlocked(id, true); toast(`@${u.username} geblokkeerd`); refreshData(); }
+      catch (err) { toast(err.message, true); }
+      break;
+    }
+
+    case 'confirm-user': {
+      const u = state.users.find(x => x.id === id);
+      const ok = await confirmDialog(`@${u.username} goedkeuren?`, 'Het account wordt bevestigd alsof deze persoon op de link in de mail heeft geklikt. Daarna kan hij of zij meteen inloggen.', 'Goedkeuren');
+      if (!ok) return;
+      try { await api.confirmUser(id); toast(`@${u.username} goedgekeurd`); refreshData(); }
+      catch (err) { toast(err.message, true); }
+      break;
+    }
+
+    case 'reset-pw': {
+      const u = state.users.find(x => x.id === id);
+      try { await busy(btn, () => api.sendPasswordReset(u.email)); toast(`Mail gestuurd naar ${u.email}`); }
       catch (err) { toast(err.message, true); }
       break;
     }

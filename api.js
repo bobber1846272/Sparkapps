@@ -168,6 +168,17 @@ function createLiveApi(supabase) {
       fail(error);
     },
 
+    async sendPasswordReset(email) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://sparkapps.nl/' });
+      fail(error);
+    },
+
+    async confirmUser(id) {
+      const { error } = await supabase.rpc('admin_confirm_user', { p_user_id: id });
+      if (error && /admin_confirm_user/i.test(error.message)) throw new Error('Draai eerst spark-confirm.sql in Supabase.');
+      fail(error);
+    },
+
     async listAnnouncements() {
       const { data, error } = await supabase.from('announcements')
         .select('*').order('created_at', { ascending: false }).limit(50);
@@ -246,12 +257,12 @@ function createDemoApi() {
   });
 
   let users = [
-    { id: 'me', username: 'beheerder', display_name: 'Beheerder', email: 'beheerder@example.com', is_admin: true, is_blocked: false, created_at: ago(30), last_sign_in_at: ago(0, 1) },
+    { id: 'me', username: 'beheerder', display_name: 'Beheerder', email: 'beheerder@example.com', is_admin: true, is_blocked: false, created_at: ago(30), last_sign_in_at: ago(0, 1), email_confirmed_at: ago(30) },
     { id: id(), username: 'henk', display_name: 'Henk', email: 'henk@example.com', is_admin: false, is_blocked: false, created_at: ago(1, 3), last_sign_in_at: ago(0, 5) },
-    { id: id(), username: 'gerard', display_name: 'Gerard Graaiman', email: 'gerard@example.com', is_admin: false, is_blocked: false, created_at: ago(2), last_sign_in_at: ago(1) },
-    { id: id(), username: 'demo', display_name: 'Demo Gebruiker', email: 'demo@example.com', is_admin: false, is_blocked: false, created_at: ago(5), last_sign_in_at: ago(3) },
-    { id: id(), username: 'spammer99', display_name: 'Spammer', email: 'spam@example.com', is_admin: false, is_blocked: true, created_at: ago(9), last_sign_in_at: ago(9) },
-    { id: id(), username: 'test', display_name: 'Testaccount', email: 'test@example.com', is_admin: false, is_blocked: false, created_at: ago(12), last_sign_in_at: ago(10) },
+    { id: id(), username: 'gerard', display_name: 'Gerard Graaiman', email: 'gerard@example.com', is_admin: false, is_blocked: false, created_at: ago(2), last_sign_in_at: ago(1), email_confirmed_at: ago(1) },
+    { id: id(), username: 'demo', display_name: 'Demo Gebruiker', email: 'demo@example.com', is_admin: false, is_blocked: false, created_at: ago(5), last_sign_in_at: ago(3), email_confirmed_at: ago(1) },
+    { id: id(), username: 'spammer99', display_name: 'Spammer', email: 'spam@example.com', is_admin: false, is_blocked: true, created_at: ago(9), last_sign_in_at: ago(9), email_confirmed_at: ago(1) },
+    { id: id(), username: 'test', display_name: 'Testaccount', email: 'test@example.com', is_admin: false, is_blocked: false, created_at: ago(12), last_sign_in_at: ago(10), email_confirmed_at: ago(1) },
   ];
 
   let announcements = [
@@ -351,6 +362,15 @@ function createDemoApi() {
       if (u.id === 'me') throw new Error('Je kunt jezelf niet blokkeren.');
       u.is_blocked = blocked;
       addLog(blocked ? 'Gebruiker geblokkeerd' : 'Gebruiker gedeblokkeerd', '@' + u.username);
+    },
+
+    async sendPasswordReset() { await wait(400); },
+
+    async confirmUser(userId) {
+      await wait();
+      const u = users.find(x => x.id === userId);
+      u.email_confirmed_at = new Date().toISOString();
+      addLog('Account handmatig goedgekeurd', '@' + u.username);
     },
 
     async listAnnouncements() {
