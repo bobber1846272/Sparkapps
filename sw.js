@@ -2,7 +2,7 @@
 // Bewaart alleen de "schil" van de app (HTML, CSS, JS, iconen),
 // zodat hij snel opent. Gegevens uit de database worden NOOIT bewaard.
 
-const CACHE = 'spark-beheer-v1';
+const CACHE = 'spark-beheer-v5';
 const SHELL = [
   './',
   './index.html',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(req)
+    fetch(req.mode === 'navigate' ? req : new Request(req, { cache: 'no-cache' }))
       .then(res => {
         if (res.ok) {
           const copy = res.clone();

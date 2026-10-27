@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi } from './api.js';
+import { createApi } from './api.js?v=5';
 
 // =============================================================
 //  Hulpjes
