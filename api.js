@@ -110,7 +110,7 @@ function createLiveApi(supabase) {
         icon_url = supabase.storage.from('app-icons').getPublicUrl(path).data.publicUrl;
       }
       const row = {
-        slug: input.slug, name: input.name, tagline: input.tagline || null,
+        slug: input.slug, name: input.name, package_name: input.package_name || null, tagline: input.tagline || null,
         description: input.description || null, color: input.color,
         status: input.status, sort_order: input.sort_order || 0, icon_url,
       };
@@ -118,7 +118,9 @@ function createLiveApi(supabase) {
         ? supabase.from('apps').update(row).eq('id', input.id)
         : supabase.from('apps').insert(row);
       const { error } = await q;
+      if (error && /apps_package_name_key/i.test(error.message)) throw new Error('Dit Android-pakket hoort al bij een andere app.');
       if (error && /apps_slug_key|duplicate/i.test(error.message)) throw new Error('Deze korte naam (slug) is al in gebruik.');
+      if (error && /package_name/i.test(error.message) && /column/i.test(error.message)) throw new Error('Draai eerst spark-store.sql in Supabase.');
       fail(error);
     },
 
@@ -309,10 +311,10 @@ function createDemoApi() {
       if (input.id) {
         const a = apps.find(x => x.id === input.id);
         const statusChanged = a.status !== input.status;
-        Object.assign(a, { slug: input.slug, name: input.name, tagline: input.tagline, description: input.description, color: input.color, status: input.status, sort_order: input.sort_order, icon_url, updated_at: new Date().toISOString() });
+        Object.assign(a, { slug: input.slug, name: input.name, package_name: input.package_name, tagline: input.tagline, description: input.description, color: input.color, status: input.status, sort_order: input.sort_order, icon_url, updated_at: new Date().toISOString() });
         addLog(statusChanged ? `Status gewijzigd naar ${input.status}` : 'App bewerkt', input.name);
       } else {
-        apps.push({ id: id(), slug: input.slug, name: input.name, tagline: input.tagline, description: input.description, color: input.color, status: input.status, sort_order: input.sort_order || apps.length, icon_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), versions: [] });
+        apps.push({ id: id(), slug: input.slug, name: input.name, package_name: input.package_name, tagline: input.tagline, description: input.description, color: input.color, status: input.status, sort_order: input.sort_order || apps.length, icon_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), versions: [] });
         addLog('App toegevoegd', input.name);
       }
     },

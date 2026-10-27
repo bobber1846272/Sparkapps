@@ -52,7 +52,8 @@ function appIcon(app) {
 }
 
 function avatar(u) {
-  const inner = u.avatar_url ? `<img src="${esc(u.avatar_url)}" alt="">` : esc((u.display_name || u.username || '?').charAt(0).toUpperCase());
+  const photo = u.avatar_url && /^https:\/\//.test(u.avatar_url);
+  const inner = photo ? `<img src="${esc(u.avatar_url)}" alt="">` : esc((u.display_name || u.username || '?').charAt(0).toUpperCase());
   return `<span class="avatar" aria-hidden="true">${inner}</span>`;
 }
 
@@ -384,6 +385,7 @@ function openAppDialog(app) {
   form.name.value = app?.name || '';
   form.slug.value = app?.slug || '';
   form.slug.dataset.touched = app ? '1' : '';
+  form.package_name.value = app?.package_name || '';
   form.tagline.value = app?.tagline || '';
   form.description.value = app?.description || '';
   form.status.value = app?.status || 'concept';
@@ -408,12 +410,14 @@ $('#form-app').addEventListener('submit', async e => {
   const icon = form.icon.files[0];
   if (!name) return showError(form, 'Geef de app een naam.');
   if (!/^[a-z0-9-]{2,40}$/.test(slug)) return showError(form, 'De korte naam mag alleen kleine letters, cijfers en - bevatten (2 tot 40 tekens).');
+  const pkg = form.package_name.value.trim();
+  if (pkg && !/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(pkg)) return showError(form, 'Het Android-pakket ziet er niet goed uit. Voorbeeld: nl.thomas.potje');
   if (icon && icon.size > 1048576) return showError(form, 'Het icoon is groter dan 1 MB.');
   showError(form, '');
   await busy($('button[type=submit]', form), async () => {
     try {
       await api.saveApp({
-        id: form.id.value || null, name, slug,
+        id: form.id.value || null, name, slug, package_name: pkg || null,
         tagline: form.tagline.value.trim(), description: form.description.value.trim(),
         status: form.status.value, sort_order: parseInt(form.sort_order.value, 10) || 0,
         color: form.color.value, icon_url: form.icon_url.value || null, iconFile: icon || null,
