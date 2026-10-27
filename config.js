@@ -15,6 +15,6 @@
 // =============================================================
 
 export const config = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_URL: 'https://kplorhptmnfddvozpxwl.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_...jouw volledige key...',
 };
