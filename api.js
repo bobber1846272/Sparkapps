@@ -211,22 +211,6 @@ function createLiveApi(supabase) {
       fail(error);
     },
 
-    // ---- Store: labels, Binnenkort en slideshow (tabel store_settings) ----
-    async getStoreSettings() {
-      const { data, error } = await supabase.from('store_settings').select('key, value, updated_at');
-      if (error && /store_settings/i.test(error.message)) throw new Error('NO_TABLE');
-      fail(error);
-      const out = {};
-      for (const r of data) out[r.key] = r.value;
-      return out;
-    },
-
-    async saveStoreSetting(key, value) {
-      const { error } = await supabase.from('store_settings').upsert({ key, value }, { onConflict: 'key' });
-      if (error && /store_settings/i.test(error.message) && /exist|schema/i.test(error.message)) throw new Error('Voer eerst supabase/store_settings.sql uit in Supabase.');
-      fail(error);
-    },
-
     // ---- Bestanden (privé, alleen beheerders) ----
     async listFiles() {
       const b = supabase.storage.from('beheer-bestanden');
@@ -259,6 +243,20 @@ function createLiveApi(supabase) {
       const { error } = await supabase.storage.from('beheer-bestanden').remove([path]);
       fail(error, 'Verwijderen mislukt');
     },
+
+    // ---- Mijn Vakanties: openbare reizen en meldingen ----
+    async mvReports(status = 'open') {
+      const { data, error } = await supabase.rpc('admin_mv_reports', { p_status: status });
+      if (error && /admin_mv_reports/i.test(error.message)) throw new Error('Draai eerst spark-vakanties.sql in Supabase.');
+      fail(error); return data || [];
+    },
+    async mvPublicList() {
+      const { data, error } = await supabase.rpc('admin_mv_public_list', { p_limit: 100 });
+      fail(error); return data || [];
+    },
+    async mvHideTrip(tripId, hidden) { const { error } = await supabase.rpc('admin_mv_hide', { p_trip: tripId, p_hidden: hidden }); fail(error); },
+    async mvHideComment(id, hidden) { const { error } = await supabase.rpc('admin_mv_hide_comment', { p_id: id, p_hidden: hidden }); fail(error); },
+    async mvReportDone(id) { const { error } = await supabase.rpc('admin_mv_report_done', { p_id: id }); fail(error); },
 
     async listLog(limit = 100) {
       const { data, error } = await supabase.from('admin_log')
@@ -297,7 +295,6 @@ function createDemoApi() {
   const wait = (ms = 220) => new Promise(r => setTimeout(r, ms));
 
   const me = { id: 'me', username: 'beheerder', display_name: 'Beheerder', avatar_url: null };
-  const storeSettings = {};
 
   const seed = [
     ['mexo', 'Mexo', 'Je loon altijd in beeld', '#2F4BFF', 'live', [['2.0.0', 20, 3]]],
@@ -350,6 +347,9 @@ function createDemoApi() {
 
   const addLog = (action, target) => log.unshift({ actor_name: '@beheerder', action, target, created_at: new Date().toISOString() });
   let signedIn = false;
+  const mvPub = [{ trip_id: 'demo1', title: 'Zomer Spanje', location: 'Barcelona', countries: ['es'], places_count: 12, likes: 4, comments: 2, hidden: false, visible: true, published_at: ago(2), owner: { username: 'demo', display_name: 'Demo Gebruiker' } }];
+  const mvRep = [{ id: 'r1', reason: 'Spam of reclame', status: 'open', created_at: ago(0.2), reporter: '@sanne', trip_id: 'demo1', trip_title: 'Zomer Spanje', trip_hidden: false,
+    trip_owner: { id: 'u-demo', username: 'demo', is_blocked: false }, comment: { id: 'c1', body: 'Koop goedkope zonnebrillen op www.spam.nl!!', hidden: false, user: { id: 'u-demo', username: 'demo', is_blocked: false } } }];
   const files = [{ folder: 'Mexo', name: 'voorbeeld.txt', path: 'Mexo/voorbeeld.txt', blob: new Blob(['Hallo']), updated_at: new Date().toISOString() }];
   const clone = x => JSON.parse(JSON.stringify(x));
 
@@ -465,13 +465,6 @@ function createDemoApi() {
       addLog(active ? 'Melding weer aangezet' : 'Melding uitgezet', a.message.slice(0, 80));
     },
 
-    async getStoreSettings() { await wait(100); return clone(storeSettings); },
-    async saveStoreSetting(key, value) {
-      await wait();
-      storeSettings[key] = clone(value);
-      addLog('Store aangepast', { labels: 'Labels', soon: 'Binnenkort', slides: 'Slideshow', soon_slide: 'Slideshow' }[key] || key);
-    },
-
     async listFiles() { await wait(120); return files.map(f => ({ folder: f.folder, name: f.name, path: f.path, size: f.blob.size, updated_at: f.updated_at })); },
     async uploadFile(folder, file, name) {
       await wait(300);
@@ -483,6 +476,11 @@ function createDemoApi() {
     async downloadFile(path) { await wait(100); return files.find(f => f.path === path).blob; },
     async deleteFile(path) { await wait(150); const i = files.findIndex(f => f.path === path); if (i > -1) files.splice(i, 1); },
 
+    async mvReports() { await wait(120); return clone(mvRep.filter(r => r.status === 'open')); },
+    async mvPublicList() { await wait(120); return clone(mvPub); },
+    async mvHideTrip(tripId, hidden) { await wait(); mvPub.forEach(p => { if (p.trip_id === tripId) p.hidden = hidden; }); mvRep.forEach(r => { if (r.trip_id === tripId) r.trip_hidden = hidden; }); addLog(hidden ? 'Reis verborgen' : 'Reis weer zichtbaar', tripId); },
+    async mvHideComment(id, hidden) { await wait(); mvRep.forEach(r => { if (r.comment && r.comment.id === id) r.comment.hidden = hidden; }); },
+    async mvReportDone(id) { await wait(); const r = mvRep.find(x => x.id === id); if (r) r.status = 'klaar'; },
     async listLog(limit = 100) { await wait(100); return clone(log.slice(0, limit)); },
 
     async serverStatus() {
