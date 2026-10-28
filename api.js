@@ -206,6 +206,39 @@ function createLiveApi(supabase) {
       fail(error);
     },
 
+    // ---- Bestanden (privé, alleen beheerders) ----
+    async listFiles() {
+      const b = supabase.storage.from('beheer-bestanden');
+      const { data: top, error } = await b.list('', { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+      fail(error, 'Bestanden laden mislukt');
+      const out = [];
+      for (const item of top || []) {
+        if (item.id) { out.push({ folder: '', name: item.name, path: item.name, size: item.metadata?.size || 0, updated_at: item.updated_at }); continue; }
+        const { data: inner, error: e2 } = await b.list(item.name, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+        fail(e2, 'Bestanden laden mislukt');
+        for (const f of inner || []) if (f.id && f.name !== '.emptyFolderPlaceholder') out.push({ folder: item.name, name: f.name, path: `${item.name}/${f.name}`, size: f.metadata?.size || 0, updated_at: f.updated_at });
+      }
+      return out;
+    },
+
+    async uploadFile(folder, file, name) {
+      const path = folder ? `${folder}/${name}` : name;
+      const { error } = await supabase.storage.from('beheer-bestanden')
+        .upload(path, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
+      fail(error, 'Uploaden mislukt');
+    },
+
+    async downloadFile(path) {
+      const { data, error } = await supabase.storage.from('beheer-bestanden').download(path);
+      fail(error, 'Downloaden mislukt');
+      return data;
+    },
+
+    async deleteFile(path) {
+      const { error } = await supabase.storage.from('beheer-bestanden').remove([path]);
+      fail(error, 'Verwijderen mislukt');
+    },
+
     async listLog(limit = 100) {
       const { data, error } = await supabase.from('admin_log')
         .select('*').order('created_at', { ascending: false }).limit(limit);
@@ -295,6 +328,7 @@ function createDemoApi() {
 
   const addLog = (action, target) => log.unshift({ actor_name: '@beheerder', action, target, created_at: new Date().toISOString() });
   let signedIn = false;
+  const files = [{ folder: 'Mexo', name: 'voorbeeld.txt', path: 'Mexo/voorbeeld.txt', blob: new Blob(['Hallo']), updated_at: new Date().toISOString() }];
   const clone = x => JSON.parse(JSON.stringify(x));
 
   return {
@@ -408,6 +442,17 @@ function createDemoApi() {
       a.active = active;
       addLog(active ? 'Melding weer aangezet' : 'Melding uitgezet', a.message.slice(0, 80));
     },
+
+    async listFiles() { await wait(120); return files.map(f => ({ folder: f.folder, name: f.name, path: f.path, size: f.blob.size, updated_at: f.updated_at })); },
+    async uploadFile(folder, file, name) {
+      await wait(300);
+      const path = folder ? `${folder}/${name}` : name;
+      const i = files.findIndex(f => f.path === path);
+      const rec = { folder, name, path, blob: file, updated_at: new Date().toISOString() };
+      if (i > -1) files[i] = rec; else files.push(rec);
+    },
+    async downloadFile(path) { await wait(100); return files.find(f => f.path === path).blob; },
+    async deleteFile(path) { await wait(150); const i = files.findIndex(f => f.path === path); if (i > -1) files.splice(i, 1); },
 
     async listLog(limit = 100) { await wait(100); return clone(log.slice(0, limit)); },
 

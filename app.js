@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi } from './api.js?v=5';
+import { createApi } from './api.js?v=6';
 
 // =============================================================
 //  Hulpjes
@@ -193,6 +193,7 @@ const VIEWS = {
   meldingen: renderAnnouncements,
   logboek: renderLog,
   server: renderServer,
+  bestanden: renderFiles,
 };
 
 async function route() {
@@ -647,6 +648,78 @@ async function renderLog(el) {
 }
 
 // =============================================================
+//  BESTANDEN (privé-map, alleen voor beheerders)
+// =============================================================
+function cleanFileName(n) {
+  return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-').replace(/[^A-Za-z0-9._()-]/g, '').replace(/^\.+/, '').slice(0, 120) || 'bestand';
+}
+function cleanFolder(n) {
+  return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().replace(/\s+/g, '-').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+}
+
+async function renderFiles(el) {
+  const files = await api.listFiles();
+  state.files = files;
+  const folders = [...new Set(files.map(f => f.folder || 'Algemeen'))].sort((a, b) => a.localeCompare(b, 'nl'));
+  el.innerHTML = `
+    <header class="page-head"><div><h1>Bestanden</h1><p class="lead">Je eigen privé-map. Alleen beheerders kunnen deze bestanden zien en downloaden.</p></div></header>
+    <section class="card" aria-labelledby="files-new">
+      <h2 id="files-new">Bestand bewaren</h2>
+      <form id="form-file" class="stack" style="display:flex;flex-direction:column;gap:14px;margin-top:12px">
+        <div class="row" style="align-items:flex-end">
+          <label class="field" style="flex:1;min-width:200px"><span>Map</span>
+            <input type="text" name="folder" list="folder-list" maxlength="40" placeholder="Bijv. Mexo of Sleutels">
+            <datalist id="folder-list">${folders.map(f => `<option value="${esc(f)}">`).join('')}</datalist>
+          </label>
+          <label class="field" style="flex:2;min-width:220px"><span>Bestand(en) (max 50 MB per stuk)</span>
+            <input type="file" name="file" multiple required>
+          </label>
+          <button type="submit" class="btn btn-primary">Uploaden</button>
+        </div>
+        <p class="error-text" data-error role="alert" hidden></p>
+      </form>
+    </section>
+    ${folders.map(folder => `
+    <section class="card" aria-label="Map ${esc(folder)}">
+      <h2>${esc(folder)}</h2>
+      <div class="list">
+        ${files.filter(f => (f.folder || 'Algemeen') === folder).map(f => `
+          <div class="list-item">
+            <div class="who-block" style="flex:1 1 220px;min-width:0"><span class="t" style="overflow-wrap:anywhere">${esc(f.name)}</span><span class="s">${f.size < 1000 ? 'kleiner dan 1 kB' : fmtSize(f.size)} · ${fmtDate(f.updated_at)}</span></div>
+            <button type="button" class="btn btn-sm" data-action="file-download" data-id="${esc(f.path)}">Downloaden</button>
+            <button type="button" class="btn btn-sm btn-danger" data-action="file-delete" data-id="${esc(f.path)}">Verwijderen</button>
+          </div>`).join('')}
+      </div>
+    </section>`).join('') || '<section class="card"><p class="empty">Nog geen bestanden bewaard.</p></section>'}`;
+}
+
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('#form-file');
+  if (!form) return;
+  e.preventDefault();
+  const list = Array.from(form.file.files || []);
+  const folder = cleanFolder(form.folder.value) || 'Algemeen';
+  if (!list.length) return showError(form, 'Kies eerst een bestand.');
+  const big = list.find(f => f.size > 52428800);
+  if (big) return showError(form, `${big.name} is groter dan 50 MB.`);
+  const exists = list.filter(f => (state.files || []).some(x => x.path === `${folder}/${cleanFileName(f.name)}`));
+  if (exists.length) {
+    const ok = await confirmDialog('Bestand vervangen?', `In de map ${folder} staat al: ${exists.map(f => cleanFileName(f.name)).join(', ')}. Wil je dat vervangen door de nieuwe versie?`, 'Vervangen');
+    if (!ok) return;
+  }
+  showError(form, '');
+  await busy($('button[type=submit]', form), async () => {
+    try {
+      for (const f of list) await api.uploadFile(folder, f, cleanFileName(f.name));
+      toast(list.length === 1 ? 'Bestand bewaard' : `${list.length} bestanden bewaard`);
+      refreshData();
+    } catch (err) { showError(form, err.message); }
+  });
+});
+
+// =============================================================
 //  SERVER
 // =============================================================
 function serverRow(s) {
@@ -773,6 +846,27 @@ document.addEventListener('click', async e => {
         refreshData();
       } catch (err) { toast(err.message, true); }
       break;
+
+    case 'file-download': {
+      try {
+        const blob = await busy(btn, () => api.downloadFile(id));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = id.split('/').pop();
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      } catch (err) { toast(err.message, true); }
+      break;
+    }
+
+    case 'file-delete': {
+      const name = id.split('/').pop();
+      const ok = await confirmDialog(`${name} verwijderen?`, 'Het bestand wordt definitief uit je privé-map gehaald. Dit kun je niet terugdraaien.', 'Verwijderen');
+      if (!ok) return;
+      try { await api.deleteFile(id); toast(`${name} verwijderd`); refreshData(); }
+      catch (err) { toast(err.message, true); }
+      break;
+    }
 
     case 'refresh':
       await busy(btn, refreshData);
