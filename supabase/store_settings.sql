@@ -4,7 +4,7 @@
 --  Supabase → SQL Editor → New query → Run.
 --
 --  Iedereen mag lezen (de store toont het aan alle gebruikers),
---  alleen beheerders (public.is_admin()) mogen aanpassen.
+--  alleen beheerders (profiles.is_admin) mogen aanpassen.
 -- =============================================================
 
 create table if not exists public.store_settings (
@@ -13,6 +13,17 @@ create table if not exists public.store_settings (
   updated_at  timestamptz not null default now(),
   updated_by  uuid default auth.uid()
 );
+
+-- Is de ingelogde gebruiker beheerder (en niet geblokkeerd)?
+create or replace function public.store_is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and is_admin = true and coalesce(is_blocked, false) = false
+  );
+$$;
+revoke all on function public.store_is_admin() from public;
+grant execute on function public.store_is_admin() to anon, authenticated;
 
 alter table public.store_settings enable row level security;
 
@@ -23,7 +34,7 @@ create policy "store_settings: iedereen mag lezen"
 drop policy if exists "store_settings: alleen beheerders" on public.store_settings;
 create policy "store_settings: alleen beheerders"
   on public.store_settings for all to authenticated
-  using (public.is_admin()) with check (public.is_admin());
+  using (public.store_is_admin()) with check (public.store_is_admin());
 
 grant select on public.store_settings to anon, authenticated;
 grant insert, update, delete on public.store_settings to authenticated;
