@@ -211,6 +211,22 @@ function createLiveApi(supabase) {
       fail(error);
     },
 
+    // ---- Store: labels, Binnenkort en slideshow (tabel store_settings) ----
+    async getStoreSettings() {
+      const { data, error } = await supabase.from('store_settings').select('key, value, updated_at');
+      if (error && /store_settings/i.test(error.message)) throw new Error('NO_TABLE');
+      fail(error);
+      const out = {};
+      for (const r of data) out[r.key] = r.value;
+      return out;
+    },
+
+    async saveStoreSetting(key, value) {
+      const { error } = await supabase.from('store_settings').upsert({ key, value }, { onConflict: 'key' });
+      if (error && /store_settings/i.test(error.message) && /exist|schema/i.test(error.message)) throw new Error('Voer eerst supabase/store_settings.sql uit in Supabase.');
+      fail(error);
+    },
+
     // ---- Bestanden (privé, alleen beheerders) ----
     async listFiles() {
       const b = supabase.storage.from('beheer-bestanden');
@@ -281,6 +297,7 @@ function createDemoApi() {
   const wait = (ms = 220) => new Promise(r => setTimeout(r, ms));
 
   const me = { id: 'me', username: 'beheerder', display_name: 'Beheerder', avatar_url: null };
+  const storeSettings = {};
 
   const seed = [
     ['mexo', 'Mexo', 'Je loon altijd in beeld', '#2F4BFF', 'live', [['2.0.0', 20, 3]]],
@@ -446,6 +463,13 @@ function createDemoApi() {
       const a = announcements.find(x => x.id === annId);
       a.active = active;
       addLog(active ? 'Melding weer aangezet' : 'Melding uitgezet', a.message.slice(0, 80));
+    },
+
+    async getStoreSettings() { await wait(100); return clone(storeSettings); },
+    async saveStoreSetting(key, value) {
+      await wait();
+      storeSettings[key] = clone(value);
+      addLog('Store aangepast', { labels: 'Labels', soon: 'Binnenkort', slides: 'Slideshow', soon_slide: 'Slideshow' }[key] || key);
     },
 
     async listFiles() { await wait(120); return files.map(f => ({ folder: f.folder, name: f.name, path: f.path, size: f.blob.size, updated_at: f.updated_at })); },
