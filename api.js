@@ -196,6 +196,11 @@ function createLiveApi(supabase) {
     },
 
     async deleteUser(id) {
+      // eerst de profielfoto's opruimen (mag mislukken, dan blijft alleen een los fotootje achter)
+      try {
+        const { data: pics } = await supabase.storage.from('avatars').list(id, { limit: 100 });
+        if (pics && pics.length) await supabase.storage.from('avatars').remove(pics.map(f => `${id}/${f.name}`));
+      } catch { /* niet erg */ }
       const { error } = await supabase.rpc('admin_delete_user', { p_user_id: id });
       if (error && /admin_delete_user/i.test(error.message)) throw new Error('Draai eerst spark-extra.sql in Supabase.');
       fail(error);
