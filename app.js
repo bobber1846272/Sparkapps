@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi } from './api.js?v=7';
+import { createApi } from './api.js?v=8';
 
 // =============================================================
 //  Hulpjes
@@ -194,6 +194,7 @@ const VIEWS = {
   logboek: renderLog,
   server: renderServer,
   bestanden: renderFiles,
+  store: renderStore,
 };
 
 async function route() {
@@ -743,6 +744,168 @@ async function renderServer(el) {
 }
 
 // =============================================================
+//  STORE: labels, Binnenkort en slideshow in de Spark-appstore
+//  (stond vroeger verstopt in de store-app zelf, achter 5x tikken)
+// =============================================================
+const LABEL_TYPES = [['auto', 'Automatisch'], ['none', 'Geen label'], ['new', 'Nieuw'], ['upd', 'Bijgewerkt'], ['hot', 'Uitgelicht'], ['pop', 'Populair'], ['beta', 'Bèta'], ['own', 'Eigen tekst']];
+const LABEL_DAYS = [[0, 'Altijd'], [7, '7 dagen'], [14, '14 dagen'], [30, '30 dagen']];
+const SOON_STATUS = [['idea', 'Idee'], ['dev', 'In ontwikkeling'], ['test', 'Testen'], ['soon', 'Bijna klaar']];
+const SOON_DEFAULT = [{ id: 'geheim', name: 'Geheim project', tagline: 'Er wordt aan gebouwd. Meer zeg ik nog niet.', status: 'dev', progress: 20, visible: true }];
+const storeKey = a => a.package_name || a.slug;      // zo herkent de store-app de app
+const store = { tab: 'labels', data: null, saved: '', noTable: false };
+
+async function renderStore(el) {
+  const [apps, data] = await Promise.all([
+    api.listApps(),
+    api.getStoreSettings().catch(err => { if (err.message === 'NO_TABLE') { store.noTable = true; return {}; } throw err; }),
+  ]);
+  state.apps = apps;
+  store.data = {
+    labels: data.labels && typeof data.labels === 'object' ? data.labels : {},
+    soon: Array.isArray(data.soon) ? data.soon : structuredClone(SOON_DEFAULT),
+    slides: Array.isArray(data.slides) ? data.slides : [],
+    soon_slide: data.soon_slide !== false,
+  };
+  store.saved = JSON.stringify(store.data);
+  drawStore(el);
+}
+
+const storeDirty = () => store.data && JSON.stringify(store.data) !== store.saved;
+const liveApps = () => state.apps.filter(a => a.status === 'live');
+
+function drawStore(el = $('#view')) {
+  const tabs = [['labels', 'Labels'], ['soon', 'Binnenkort'], ['slides', 'Slideshow']];
+  const intro = {
+    labels: 'Kies per app welk label er op de kaarten in de store staat. <strong>Automatisch</strong> laat de store zelf kiezen: Nieuw of Bijgewerkt, 14 dagen lang.',
+    soon: 'Apps waar je aan werkt. Ze staan in de store onder Binnenkort. Staat een app eenmaal in de store met dezelfde naam, dan verdwijnt hij daar vanzelf.',
+    slides: 'Kies welke apps in de slideshow op de hoofdpagina van de store komen, in de volgorde waarin je ze aanvinkt. Vink je <strong>niks</strong> aan, dan doet de store het automatisch.',
+  }[store.tab];
+  el.innerHTML = `
+    <header class="page-head">
+      <div><h1>Store</h1><p class="lead">Hoe de Spark-appstore eruitziet voor iedereen.</p></div>
+      <div class="row">
+        <span class="pill ${storeDirty() ? 'pill-concept' : 'pill-live'}" id="store-state">${storeDirty() ? 'Niet opgeslagen' : 'Opgeslagen'}</span>
+        <button type="button" class="btn btn-primary" data-action="store-save" ${store.noTable ? 'disabled' : ''}>Opslaan</button>
+      </div>
+    </header>
+    ${store.noTable ? `<div class="banner banner-error"><span><strong>Nog één stap.</strong> Voer <code>supabase/store_settings.sql</code> uit in Supabase (SQL Editor → New query → Run). Daarna kun je hier opslaan.</span></div>` : ''}
+    <section class="card">
+      <div class="card-head">
+        <div class="filters" role="tablist" aria-label="Onderdeel">
+          ${tabs.map(([v, l]) => `<button type="button" class="chip" role="tab" data-action="store-tab" data-value="${v}" aria-pressed="${store.tab === v}">${l}</button>`).join('')}
+        </div>
+        ${store.tab === 'labels' ? '<button type="button" class="btn btn-sm" data-action="store-labels-auto">Alles automatisch</button>'
+          : store.tab === 'slides' ? '<button type="button" class="btn btn-sm" data-action="store-slides-auto">Automatisch</button>'
+          : '<button type="button" class="btn btn-sm btn-primary" data-action="soon-add">+ App toevoegen</button>'}
+      </div>
+      <p style="color:var(--muted);font-size:14px;margin:4px 0 14px">${intro}</p>
+      <div class="list">${store.tab === 'labels' ? drawLabels() : store.tab === 'soon' ? drawSoon() : drawSlides()}</div>
+    </section>`;
+}
+
+function drawLabels() {
+  const apps = liveApps();
+  if (!apps.length) return '<p class="empty">Nog geen live apps. Zet een app op Live bij Apps.</p>';
+  return apps.map(a => {
+    const k = storeKey(a), cur = store.data.labels[k] || { type: 'auto' };
+    const left = cur.until ? Math.ceil((cur.until - Date.now()) / 864e5) : 0;
+    return `
+      <div class="list-item" style="flex-wrap:wrap">
+        <div class="app-cell" style="flex:1 1 220px">${appIcon(a)}<div><div class="t">${esc(a.name)}</div><div class="s">${cur.until ? (left > 0 ? `nog ${left} ${left === 1 ? 'dag' : 'dagen'} zichtbaar` : 'verlopen, weer automatisch') : esc(k)}</div></div></div>
+        <label><span class="sr-only">Label voor ${esc(a.name)}</span>
+          <select data-st="label-type" data-key="${esc(k)}">${LABEL_TYPES.map(([v, l]) => `<option value="${v}" ${cur.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        ${cur.type === 'own' ? `<label><span class="sr-only">Eigen tekst</span><input type="text" maxlength="16" placeholder="Bijv. Favoriet" value="${esc(cur.text || '')}" data-st="label-text" data-key="${esc(k)}" style="width:150px"></label>` : ''}
+        ${cur.type !== 'auto' && cur.type !== 'none' ? `<label><span class="sr-only">Hoe lang</span><select data-st="label-days" data-key="${esc(k)}">${LABEL_DAYS.map(([v, l]) => `<option value="${v}" ${(cur.days || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+      </div>`;
+  }).join('') + '<p class="empty" style="text-align:left;padding:12px 4px 0">Staat een app er niet tussen? Zet hem bij Apps op Live en vul het Android-pakket in.</p>';
+}
+
+function drawSoon() {
+  const l = store.data.soon;
+  if (!l.length) return '<p class="empty">Nog niks in de maak.</p>';
+  return l.map((x, i) => `
+    <div class="list-item" style="flex-direction:column;align-items:stretch;gap:10px;${x.visible === false ? 'opacity:.6' : ''}">
+      <div class="row" style="gap:8px">
+        <label class="field" style="flex:1;min-width:200px"><span>Naam</span><input type="text" maxlength="28" placeholder="Naam van de app" value="${esc(x.name || '')}" data-st="soon-name" data-i="${i}"></label>
+        <label class="field"><span>Status</span><select data-st="soon-status" data-i="${i}">${SOON_STATUS.map(([v, t]) => `<option value="${v}" ${(x.status || 'dev') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      </div>
+      <label class="field"><span>Korte teaser</span><textarea rows="2" maxlength="90" data-st="soon-tagline" data-i="${i}">${esc(x.tagline || '')}</textarea></label>
+      <label class="field"><span>Voortgang <strong id="soon-p-${i}">${+x.progress || 0}%</strong></span><input type="range" min="0" max="100" step="5" value="${+x.progress || 0}" data-st="soon-progress" data-i="${i}"></label>
+      <div class="row" style="gap:8px">
+        <label style="display:inline-flex;align-items:center;gap:8px"><input type="checkbox" ${x.visible === false ? '' : 'checked'} data-st="soon-visible" data-i="${i}"> Zichtbaar in de store</label>
+        <span style="flex:1"></span>
+        <button type="button" class="btn btn-sm" data-action="soon-move" data-id="${i}" data-value="-1" ${i === 0 ? 'disabled' : ''} aria-label="Omhoog">↑</button>
+        <button type="button" class="btn btn-sm" data-action="soon-move" data-id="${i}" data-value="1" ${i === l.length - 1 ? 'disabled' : ''} aria-label="Omlaag">↓</button>
+        <button type="button" class="btn btn-sm btn-danger" data-action="soon-del" data-id="${i}">Verwijderen</button>
+      </div>
+    </div>`).join('');
+}
+
+function drawSlides() {
+  const apps = liveApps(), pick = store.data.slides;
+  return apps.map(a => {
+    const k = storeKey(a), i = pick.indexOf(k);
+    return `
+      <label class="list-item" style="cursor:pointer">
+        <input type="checkbox" ${i > -1 ? 'checked' : ''} data-st="slide" data-key="${esc(k)}">
+        <div class="app-cell" style="flex:1">${appIcon(a)}<div><div class="t">${esc(a.name)}</div><div class="s">${esc(a.tagline || '')}</div></div></div>
+        ${i > -1 ? `<span class="pill pill-admin">${i + 1}</span>` : ''}
+      </label>`;
+  }).join('') + `
+    <label class="list-item" style="cursor:pointer">
+      <input type="checkbox" ${store.data.soon_slide ? 'checked' : ''} data-st="soon-slide">
+      <div class="who-block"><span class="t">Binnenkort-slide</span><span class="s">Altijd als laatste, alleen als er iets in Binnenkort staat</span></div>
+    </label>`;
+}
+
+function markStore() {
+  const p = $('#store-state'); if (!p) return;
+  const d = storeDirty();
+  p.className = `pill ${d ? 'pill-concept' : 'pill-live'}`; p.textContent = d ? 'Niet opgeslagen' : 'Opgeslagen';
+}
+
+// Wijzigingen in het Store-scherm (zonder alles opnieuw te tekenen tijdens het typen)
+function storeInput(e) {
+  const t = e.target, kind = t.dataset?.st;
+  if (!kind || !store.data) return;
+  const d = store.data, i = +t.dataset.i, k = t.dataset.key;
+  if (kind === 'label-type') {
+    if (t.value === 'auto') delete d.labels[k];
+    else { const c = d.labels[k] || {}; c.type = t.value; if (t.value === 'none') { delete c.until; delete c.days; } d.labels[k] = c; }
+    drawStore();
+  } else if (kind === 'label-text') { if (d.labels[k]) d.labels[k].text = t.value.trim(); }
+  else if (kind === 'label-days') {
+    const c = d.labels[k]; if (!c) return; const n = +t.value;
+    c.days = n; if (n) c.until = Date.now() + n * 864e5; else delete c.until;
+    drawStore();
+  }
+  else if (kind === 'soon-name') d.soon[i].name = t.value;
+  else if (kind === 'soon-tagline') d.soon[i].tagline = t.value;
+  else if (kind === 'soon-status') { d.soon[i].status = t.value; if (t.value === 'soon' && (+d.soon[i].progress || 0) < 80) { d.soon[i].progress = 90; drawStore(); } }
+  else if (kind === 'soon-progress') { d.soon[i].progress = +t.value; const b = $(`#soon-p-${i}`); if (b) b.textContent = t.value + '%'; }
+  else if (kind === 'soon-visible') { d.soon[i].visible = t.checked; drawStore(); }
+  else if (kind === 'slide') { const at = d.slides.indexOf(k); if (t.checked && at < 0) d.slides.push(k); if (!t.checked && at > -1) d.slides.splice(at, 1); drawStore(); }
+  else if (kind === 'soon-slide') d.soon_slide = t.checked;
+  markStore();
+}
+document.addEventListener('input', e => { if (e.target.dataset?.st && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') storeInput(e); });
+document.addEventListener('change', e => { if (e.target.dataset?.st && (e.target.type === 'checkbox' || e.target.tagName === 'SELECT')) storeInput(e); });
+window.addEventListener('beforeunload', e => { if (storeDirty() && location.hash === '#store') { e.preventDefault(); e.returnValue = ''; } });
+
+async function saveStore(btn) {
+  const before = JSON.parse(store.saved), d = store.data;
+  d.soon = d.soon.filter(x => (x.name || '').trim() || (x.tagline || '').trim());
+  await busy(btn, async () => {
+    for (const key of ['labels', 'soon', 'slides', 'soon_slide']) {
+      if (JSON.stringify(before[key]) !== JSON.stringify(d[key])) await api.saveStoreSetting(key, d[key]);
+    }
+  });
+  store.saved = JSON.stringify(d);
+  drawStore();
+  toast('Opgeslagen. De store laat het zien zodra hij opnieuw opent');
+}
+
+// =============================================================
 //  Klikken (één luisteraar voor de hele app)
 // =============================================================
 document.addEventListener('click', async e => {
@@ -871,6 +1034,31 @@ document.addEventListener('click', async e => {
     case 'refresh':
       await busy(btn, refreshData);
       break;
+
+    case 'store-tab': store.tab = value; drawStore(); break;
+    case 'store-save':
+      try { await saveStore(btn); } catch (err) { toast(err.message, true); }
+      break;
+    case 'store-labels-auto': store.data.labels = {}; drawStore(); break;
+    case 'store-slides-auto': store.data.slides = []; drawStore(); break;
+    case 'soon-add':
+      store.data.soon.push({ id: 'soon-' + Date.now(), name: '', tagline: '', status: 'idea', progress: 0, visible: true });
+      drawStore();
+      $$('[data-st=soon-name]').pop()?.focus();
+      break;
+    case 'soon-move': {
+      const l = store.data.soon, i = +id, j = i + (+value);
+      if (j < 0 || j >= l.length) break;
+      [l[i], l[j]] = [l[j], l[i]]; drawStore();
+      break;
+    }
+    case 'soon-del': {
+      const x = store.data.soon[+id];
+      const ok = await confirmDialog(`${x.name || 'Deze app'} weghalen?`, 'Hij verdwijnt uit Binnenkort zodra je opslaat.', 'Weghalen');
+      if (!ok) return;
+      store.data.soon.splice(+id, 1); drawStore();
+      break;
+    }
   }
 });
 
