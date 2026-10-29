@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 
@@ -64,12 +64,14 @@
       <a href="#overzicht" data-route="overzicht">Overzicht</a>
       <a href="#apps" data-route="apps">Apps <span class="count" id="count-apps"></span></a>
       <a href="#gebruikers" data-route="gebruikers">Gebruikers <span class="count" id="count-users"></span></a>
+      <a href="#aanvragen" data-route="aanvragen">Aanvragen <span class="count" id="count-requests"></span></a>
       <a href="#meldingen" data-route="meldingen">Meldingen</a>
       <a href="#store" data-route="store">Store</a>
       <a href="#logboek" data-route="logboek">Logboek</a>
       <a href="#reizen" data-route="reizen">Reizen <span class="count" id="count-reports"></span></a>
       <a href="#bestanden" data-route="bestanden">Bestanden</a>
       <a href="#server" data-route="server">Server</a>
+      <a href="#beheerders" data-route="beheerders">Beheerders</a>
     </nav>
     <div class="side-foot">
       <span class="lbl">Ingelogd als</span>
@@ -140,6 +142,7 @@
         <input type="file" name="icon" accept="image/png,image/jpeg,image/webp,image/svg+xml">
       </label>
     </div>
+    <p class="banner" id="app-core-note" hidden><span><strong>Dit is de appstore.</strong> Hij blijft live, het Android-pakket ligt vast en je kunt hem niet verwijderen.</span></p>
     <p class="error-text" data-error role="alert" hidden></p>
     <div class="dlg-foot">
       <button type="button" class="btn btn-danger" data-action="delete-app" hidden>Verwijderen</button>
@@ -209,6 +212,76 @@
 </dialog>
 
 <!-- Dialoog: gebruiker bekijken -->
+
+<dialog id="dlg-req" aria-labelledby="dlg-req-title">
+  <form class="dlg" method="dialog" id="form-req" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-req-title">Aanvraag</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="req-meta" class="req-meta"></div>
+    <label class="field">
+      <span>Status</span>
+      <select name="status">
+        <option value="nieuw">Nieuw</option>
+        <option value="bekeken">Bekeken</option>
+        <option value="bezig">Mee bezig</option>
+        <option value="klaar">Klaar</option>
+        <option value="afgewezen">Afgewezen</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Antwoord</span>
+      <textarea name="reply" rows="4" maxlength="3000" placeholder="De afzender ziet dit op zijn Spark Account op sparkapps.nl"></textarea>
+    </label>
+    <p class="error-text" data-error role="alert" hidden></p>
+    <div class="dlg-foot">
+      <button type="button" class="btn btn-danger" data-action="req-delete">Verwijderen</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" data-close>Annuleren</button>
+      <button type="submit" class="btn btn-primary">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-staff" aria-labelledby="dlg-staff-title">
+  <form class="dlg" method="dialog" id="form-staff" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-staff-title">Beheerder toevoegen</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <input type="hidden" name="user">
+    <div id="staff-who"></div>
+    <div id="staff-pick" class="field">
+      <label for="staff-search"><span>Wie?</span></label>
+      <input type="search" id="staff-search" placeholder="Zoek op naam, @gebruikersnaam of e-mail" autocomplete="off">
+      <div id="staff-results" class="pick-list" role="radiogroup" aria-label="Kies een gebruiker"></div>
+    </div>
+    <label class="field">
+      <span>Rol</span>
+      <select name="role">
+        <option value="beheerder">Beheerder</option>
+        <option value="app-beheerder">App-beheerder</option>
+        <option value="moderator">Moderator</option>
+        <option value="helpdesk">Helpdesk</option>
+        <option value="eigen">Eigen keuze</option>
+      </select>
+      <small id="staff-role-note"></small>
+    </label>
+    <fieldset class="perm-set">
+      <legend>Wat mag deze beheerder?</legend>
+      <div id="staff-perms"></div>
+    </fieldset>
+    <p class="banner" style="margin:0"><span>Beheerders toevoegen, wijzigen en weghalen blijft altijd alleen bij jou.</span></p>
+    <p class="error-text" data-error role="alert" hidden></p>
+    <div class="dlg-foot">
+      <span style="flex:1"></span>
+      <button type="button" class="btn" data-close>Annuleren</button>
+      <button type="submit" class="btn btn-primary">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlg-user" aria-labelledby="dlg-user-title">
   <div class="dlg">
     <div class="dlg-head">
@@ -235,6 +308,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=10"></script>
+<script type="module" src="app.js?v=12"></script>
 </body>
 </html>
