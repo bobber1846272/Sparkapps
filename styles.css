@@ -119,7 +119,8 @@ input[type="file"] { font: inherit; font-size: 14px; }
   background: var(--side); color: #E7E9EE;
   padding: 26px 18px; display: flex; flex-direction: column; gap: 26px;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 6px; margin: -6px 0; border-radius: 10px; color: inherit; text-decoration: none; }
+.brand:hover { background: #161B26; color: inherit; }
 .brand .name { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1.1; }
 .brand .sub { font-size: 12px; color: var(--side-muted); }
 .nav { display: flex; flex-direction: column; gap: 3px; }
@@ -328,3 +329,19 @@ td.perm-col .no { color: var(--muted); }
   .side { position: sticky; top: 0; height: 100vh; align-self: flex-start; overflow-y: auto; gap: 22px; }
   .nav a { padding-top: 8px; padding-bottom: 8px; }
 }
+
+/* Overzicht: blokken in je eigen volgorde */
+.ov-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.ov-grid > .ov-full { grid-column: 1 / -1; }
+.ov-grid > .ov-w > .card { height: 100%; }
+@media (max-width: 1000px) { .ov-grid { grid-template-columns: minmax(0, 1fr); } }
+.ov-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ov-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.ov-item:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.ov-check { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; min-width: 0; }
+.ov-check span { display: flex; flex-direction: column; }
+.ov-check small { color: var(--muted); font-size: 12.5px; }
+.ov-move { display: flex; gap: 4px; }
+.ov-move .icon-btn { width: 34px; height: 34px; font-size: 16px; }
+.ov-move .icon-btn:disabled { opacity: .3; cursor: default; }
+.ov-blocked { margin: 0; font-size: 13px; color: var(--muted); }

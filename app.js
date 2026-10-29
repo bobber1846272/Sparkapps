@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi, ALL_PERMS } from './api.js?v=12';
+import { createApi, ALL_PERMS } from './api.js?v=15';
 
 // =============================================================
 //  Hulpjes
@@ -300,16 +300,84 @@ async function refreshData() {
 // =============================================================
 //  OVERZICHT
 // =============================================================
+// Blokken op het overzicht. Je ziet alleen blokken waar je het recht voor hebt;
+// welke je daarvan wilt zien en in welke volgorde, kies je zelf (Overzicht aanpassen).
+const WIDGETS = [
+  { id: 'stats', label: 'Kerncijfers', desc: 'Apps, accounts en downloads', perm: null, full: true },
+  { id: 'apps', label: 'Apps', desc: 'De nieuwste apps en versies', perm: 'apps', full: true },
+  { id: 'requests', label: 'Aanvragen en feedback', desc: 'Wat er nog open staat', perm: 'requests' },
+  { id: 'users', label: 'Nieuwste gebruikers', desc: 'Wie er net een account heeft', perm: 'users' },
+  { id: 'server', label: 'Server', desc: 'Draait alles nog?', perm: 'server' },
+  { id: 'announce', label: 'Melding in de store', desc: 'Snel een melding plaatsen', perm: 'announcements' },
+  { id: 'log', label: 'Logboek', desc: 'Wat er laatst gebeurd is', perm: 'log' },
+];
+
+function myPrefs() {
+  let p = state.access?.prefs;
+  if (!p || typeof p !== 'object' || !Object.keys(p).length) { try { p = JSON.parse(localStorage.getItem('beheer-prefs') || '{}'); } catch { p = {}; } }
+  return p || {};
+}
+
+// De blokken die deze beheerder mag zien, in zijn eigen volgorde, met aan/uit
+function myWidgets() {
+  const ov = myPrefs().overview || {};
+  const allowed = WIDGETS.filter(w => can(w.perm));
+  const order = Array.isArray(ov.order) ? ov.order : [];
+  const hidden = Array.isArray(ov.hidden) ? ov.hidden : [];
+  const pos = id => { const i = order.indexOf(id); return i < 0 ? 100 + WIDGETS.findIndex(w => w.id === id) : i; };
+  return allowed.sort((a, b) => pos(a.id) - pos(b.id)).map(w => ({ ...w, on: !hidden.includes(w.id) }));
+}
+
 async function renderOverview(el) {
+  const shown = myWidgets().filter(w => w.on);
+  const on = id => shown.some(w => w.id === id);
   const none = async () => [];
   const [stats, apps, users, log, server, requests] = await Promise.all([
-    api.stats(), can('apps') ? api.listApps() : none(), can('users') ? api.listUsers() : none(),
-    can('log') ? api.listLog(6) : none(), can('server') ? api.serverStatus() : none(),
-    can('requests') ? api.listRequests().catch(() => []) : none(),
+    api.stats(), on('apps') ? api.listApps() : none(), on('users') ? api.listUsers() : none(),
+    on('log') ? api.listLog(6) : none(), can('server') ? api.serverStatus() : none(),
+    on('requests') || (on('stats') && can('requests') && !can('server')) ? api.listRequests().catch(() => []) : none(),
   ]);
-  state.stats = stats; state.apps = apps; state.users = users;
+  state.stats = stats; if (apps.length) state.apps = apps; if (users.length) state.users = users;
   const backup = server.find(s => /back-up/i.test(s.name));
   const openReq = requests.filter(r => r.status === 'nieuw' || r.status === 'bekeken' || r.status === 'bezig');
+
+  const html = {
+    stats: () => `<section class="stats" aria-label="Kerncijfers">
+      ${statCard('Apps in de store', stats.apps_live, `${fmtNumber(stats.apps_concept)} concept · ${fmtNumber(stats.apps_total)} totaal`)}
+      ${statCard('Spark Accounts', stats.users_total, `${fmtNumber(stats.users_new_week)} nieuw deze week`)}
+      ${statCard('Downloads deze week', stats.downloads_week, stats.top_app_week ? `Meest: ${esc(stats.top_app_week)}` : 'Nog geen downloads')}
+      ${can('server') ? `<div class="stat">
+        <span class="lbl">Laatste back-up</span>
+        <span class="val ${backup && backup.state === 'ok' ? 'ok' : ''}">${backup && backup.state === 'ok' ? esc(backup.label) : '—'}</span>
+        <span class="sub">${backup ? esc(backup.detail) : 'Nog niet ingesteld'}</span>
+      </div>` : can('requests') ? statCard('Open aanvragen', openReq.length, `${fmtNumber(requests.filter(r => r.status === 'nieuw').length)} nieuw`) : ''}
+    </section>`,
+    apps: () => `<section class="card" aria-labelledby="ov-apps">
+      <div class="card-head"><h2 id="ov-apps">Apps</h2><a href="#apps">Alle apps beheren</a></div>
+      ${appsTable(storeFirst(apps).slice(0, 6), stats.downloads_per_app)}
+    </section>`,
+    requests: () => `<section class="card" aria-labelledby="ov-req">
+      <div class="card-head"><h2 id="ov-req">Aanvragen en feedback</h2><a href="#aanvragen">Alles bekijken</a></div>
+      <div class="list">${openReq.slice(0, 4).map(requestRow).join('') || '<p class="empty">Niks open. Lekker bezig!</p>'}</div>
+    </section>`,
+    users: () => `<section class="card" aria-labelledby="ov-users">
+      <div class="card-head"><h2 id="ov-users">Nieuwste gebruikers</h2><a href="#gebruikers">Alle gebruikers</a></div>
+      <div class="list">${users.slice(0, 4).map(userRow).join('') || '<p class="empty">Nog geen gebruikers.</p>'}</div>
+    </section>`,
+    server: () => `<section class="card" aria-labelledby="ov-server">
+      <div class="card-head"><h2 id="ov-server">Server</h2><a href="#server">Details</a></div>
+      <div class="list">${server.map(serverRow).join('')}</div>
+    </section>`,
+    announce: () => `<section class="card" aria-labelledby="ov-ann">
+      <h2 id="ov-ann">Melding in de store</h2>
+      <p style="color:var(--muted);font-size:14px">Verschijnt bovenaan in de Spark-appstore bij iedereen.</p>
+      ${announcementForm('ov')}
+    </section>`,
+    log: () => `<section class="card" aria-labelledby="ov-log">
+      <div class="card-head"><h2 id="ov-log">Logboek</h2><a href="#logboek">Volledig logboek</a></div>
+      <div class="list">${log.map(logRow).join('') || '<p class="empty">Nog niks gebeurd.</p>'}</div>
+    </section>`,
+  };
 
   el.innerHTML = `
     <header class="page-head">
@@ -319,6 +387,7 @@ async function renderOverview(el) {
       </div>
       <div class="row">
         ${can('server') ? serverPill(server) : ''}
+        <button type="button" class="btn" data-action="ov-edit">Overzicht aanpassen</button>
         ${can('apps') ? '<button type="button" class="btn btn-primary" data-action="new-app">+ Nieuwe app</button>' : ''}
       </div>
     </header>
@@ -326,53 +395,59 @@ async function renderOverview(el) {
     ${state.access?.legacy ? `<div class="banner"><span><strong>Nog één stap voor subbeheerders.</strong> Voer <code>supabase/beheerders_aanvragen.sql</code> uit in Supabase. Tot die tijd werkt Beheer zoals altijd.</span></div>` : ''}
     ${api.mode === 'demo' ? `<div class="banner"><span><strong>Demo-stand.</strong> Je kijkt naar voorbeeldgegevens. Wijzigingen verdwijnen als je de pagina ververst. Vul <code>config.js</code> in om je echte database te koppelen.</span></div>` : ''}
 
-    <section class="stats" aria-label="Kerncijfers">
-      ${statCard('Apps in de store', stats.apps_live, `${fmtNumber(stats.apps_concept)} concept · ${fmtNumber(stats.apps_total)} totaal`)}
-      ${statCard('Spark Accounts', stats.users_total, `${fmtNumber(stats.users_new_week)} nieuw deze week`)}
-      ${statCard('Downloads deze week', stats.downloads_week, stats.top_app_week ? `Meest: ${esc(stats.top_app_week)}` : 'Nog geen downloads')}
-      ${can('server') ? `<div class="stat">
-        <span class="lbl">Laatste back-up</span>
-        <span class="val ${backup && backup.state === 'ok' ? 'ok' : ''}">${backup && backup.state === 'ok' ? esc(backup.label) : '—'}</span>
-        <span class="sub">${backup ? esc(backup.detail) : 'Nog niet ingesteld'}</span>
-      </div>` : can('requests') ? statCard('Open aanvragen', openReq.length, `${fmtNumber(requests.filter(r => r.status === 'nieuw').length)} nieuw`) : ''}
-    </section>
-
-    ${can('apps') ? `<section class="card" aria-labelledby="ov-apps">
-      <div class="card-head">
-        <h2 id="ov-apps">Apps</h2>
-        <a href="#apps">Alle apps beheren</a>
-      </div>
-      ${appsTable(storeFirst(apps).slice(0, 6), stats.downloads_per_app)}
-    </section>` : ''}
-
-    <div class="grid-2">
-      ${can('requests') ? `<section class="card" aria-labelledby="ov-req">
-        <div class="card-head"><h2 id="ov-req">Aanvragen en feedback</h2><a href="#aanvragen">Alles bekijken</a></div>
-        <div class="list">${openReq.slice(0, 4).map(requestRow).join('') || '<p class="empty">Niks open. Lekker bezig!</p>'}</div>
-      </section>` : ''}
-
-      ${can('users') ? `<section class="card" aria-labelledby="ov-users">
-        <div class="card-head"><h2 id="ov-users">Nieuwste gebruikers</h2><a href="#gebruikers">Alle gebruikers</a></div>
-        <div class="list">${users.slice(0, 4).map(userRow).join('') || '<p class="empty">Nog geen gebruikers.</p>'}</div>
-      </section>` : ''}
-
-      ${can('server') ? `<section class="card" aria-labelledby="ov-server">
-        <div class="card-head"><h2 id="ov-server">Server</h2><a href="#server">Details</a></div>
-        <div class="list">${server.map(serverRow).join('')}</div>
-      </section>` : ''}
-
-      ${can('announcements') ? `<section class="card" aria-labelledby="ov-ann">
-        <h2 id="ov-ann">Melding in de store</h2>
-        <p style="color:var(--muted);font-size:14px">Verschijnt bovenaan in de Spark-appstore bij iedereen.</p>
-        ${announcementForm('ov')}
-      </section>` : ''}
-
-      ${can('log') ? `<section class="card" aria-labelledby="ov-log">
-        <div class="card-head"><h2 id="ov-log">Logboek</h2><a href="#logboek">Volledig logboek</a></div>
-        <div class="list">${log.map(logRow).join('') || '<p class="empty">Nog niks gebeurd.</p>'}</div>
-      </section>` : ''}
+    <div class="ov-grid">
+      ${shown.map(w => `<div class="ov-w${w.full ? ' ov-full' : ''}" data-w="${w.id}">${html[w.id]()}</div>`).join('')
+        || `<section class="card ov-full"><p class="empty" style="margin:0">Je overzicht is leeg. Kies via <b>Overzicht aanpassen</b> wat je hier wilt zien.</p></section>`}
     </div>`;
 }
+
+// ---- Overzicht aanpassen ----
+let ovDraft = [];
+function openOverviewDialog() {
+  ovDraft = myWidgets();
+  drawOverviewDialog();
+  $('#dlg-ov').showModal();
+}
+function drawOverviewDialog() {
+  const blocked = WIDGETS.filter(w => !can(w.perm));
+  $('#ov-list').innerHTML = ovDraft.map((w, i) => `
+    <li class="ov-item">
+      <label class="ov-check"><input type="checkbox" data-ov-toggle="${w.id}" ${w.on ? 'checked' : ''}>
+        <span><b>${esc(w.label)}</b><small>${esc(w.desc)}${w.full ? ' · hele breedte' : ''}</small></span></label>
+      <span class="ov-move">
+        <button type="button" class="icon-btn" data-ov-move="${i}" data-dir="-1" aria-label="${esc(w.label)} omhoog" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="icon-btn" data-ov-move="${i}" data-dir="1" aria-label="${esc(w.label)} omlaag" ${i === ovDraft.length - 1 ? 'disabled' : ''}>↓</button>
+      </span>
+    </li>`).join('');
+  $('#ov-blocked').hidden = !blocked.length;
+  $('#ov-blocked').textContent = blocked.length ? `Niet voor jou beschikbaar (geen recht): ${blocked.map(w => w.label).join(', ')}.` : '';
+}
+$('#ov-list').addEventListener('change', e => {
+  const id = e.target.dataset.ovToggle; if (!id) return;
+  ovDraft.find(w => w.id === id).on = e.target.checked;
+});
+$('#ov-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-ov-move]'); if (!b) return;
+  const i = +b.dataset.ovMove, j = i + +b.dataset.dir;
+  if (j < 0 || j >= ovDraft.length) return;
+  [ovDraft[i], ovDraft[j]] = [ovDraft[j], ovDraft[i]];
+  drawOverviewDialog();
+  $(`[data-ov-move="${j}"][data-dir="${b.dataset.dir}"]`)?.focus();
+});
+$('#form-ov').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const prefs = { ...myPrefs(), overview: { order: ovDraft.map(w => w.id), hidden: ovDraft.filter(w => !w.on).map(w => w.id) } };
+  await busy($('button[type=submit]', form), async () => {
+    try {
+      const where = await api.savePrefs(prefs);
+      state.access = { ...state.access, prefs };
+      $('#dlg-ov').close();
+      toast(where === 'local' ? 'Opgeslagen in deze browser' : 'Je overzicht is opgeslagen');
+      route();
+    } catch (err) { showError(form, err.message); }
+  });
+});
 
 function statCard(label, value, sub) {
   return `<div class="stat"><span class="lbl">${esc(label)}</span><span class="val">${fmtNumber(value)}</span><span class="sub">${sub}</span></div>`;
@@ -1465,6 +1540,12 @@ document.addEventListener('click', async e => {
       openAppDialog(null);
       break;
 
+    case 'ov-edit': openOverviewDialog(); break;
+    case 'ov-reset':
+      ovDraft = WIDGETS.filter(w => can(w.perm)).map(w => ({ ...w, on: true }));
+      drawOverviewDialog();
+      break;
+
     case 'add-store':
       openAppDialog(null, { name: 'Spark Apps', slug: 'spark-apps', package_name: STORE_PKG, status: 'live', color: '#12285A', sort_order: 0,
         tagline: 'Alle Spark-apps, updates en je account' });
@@ -1683,3 +1764,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 boot();
+
+// Logo = home-knop: altijd terug naar het overzicht (ook als je er al bent: dan ververst hij)
+$('.brand').addEventListener('click', e => {
+  if (location.hash === '#overzicht') { e.preventDefault(); window.scrollTo({ top: 0 }); route(); }
+});

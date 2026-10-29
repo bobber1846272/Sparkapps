@@ -172,6 +172,17 @@ function createLiveApi(supabase) {
       return data || { owner: false, role: null, perms: [] };
     },
 
+    // Eigen instellingen van de beheerder (bijv. het overzicht). Lukt het niet in de database, dan in deze browser.
+    async savePrefs(prefs) {
+      const { error } = await supabase.rpc('sa_save_prefs', { p_prefs: prefs });
+      if (error) {
+        try { localStorage.setItem('beheer-prefs', JSON.stringify(prefs)); } catch { /* */ }
+        if (/sa_save_prefs|function|schema cache|not find/i.test(error.message)) return 'local';
+        fail(error);
+      }
+      return 'db';
+    },
+
     async listStaff() {
       const { data, error } = await supabase.rpc('sa_list');
       fail(error);
@@ -460,6 +471,7 @@ function createDemoApi() {
 
   // Rechten. Bekijk de demo als een andere rol met ?als=moderator (of app-beheerder, helpdesk).
   const asRole = new URLSearchParams(location.search).get('als');
+  let demoPrefs = {};
   const ROLE_DEMO = { 'app-beheerder': ['apps', 'store', 'announcements', 'log'], moderator: ['users', 'trips', 'requests', 'announcements'], helpdesk: ['requests', 'users'] };
   let staff = [
     { user_id: 'me', role: 'eigenaar', perms: ALL_PERMS, created_at: ago(30) },
@@ -591,9 +603,11 @@ function createDemoApi() {
 
     async myAccess() {
       await wait(60);
-      if (asRole && ROLE_DEMO[asRole]) return { owner: false, role: asRole, perms: ROLE_DEMO[asRole] };
-      return { owner: true, role: 'eigenaar', perms: ALL_PERMS };
+      if (asRole && ROLE_DEMO[asRole]) return { owner: false, role: asRole, perms: ROLE_DEMO[asRole], prefs: demoPrefs };
+      return { owner: true, role: 'eigenaar', perms: ALL_PERMS, prefs: demoPrefs };
     },
+
+    async savePrefs(prefs) { await wait(); demoPrefs = prefs; return 'db'; },
 
     async listStaff() {
       await wait(100);
