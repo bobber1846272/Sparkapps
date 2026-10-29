@@ -43,6 +43,13 @@ function slugify(s) {
 
 const STATUS_LABEL = { live: 'Live', concept: 'Concept', verborgen: 'Verborgen' };
 
+// De Spark-appstore zelf. Zonder deze app kan niemand de andere apps installeren of updaten,
+// dus hij staat altijd bovenaan, blijft live en kan niet verwijderd worden.
+const STORE_PKG = 'nl.thomas.sparkapps';
+const isStoreApp = a => !!a && a.package_name === STORE_PKG;
+const storeFirst = list => [...list].sort((a, b) => isStoreApp(b) - isStoreApp(a));
+const PIN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z"/></svg>';
+
 function appIcon(app) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(app.color) ? app.color : '#2F4BFF';
   const inner = app.icon_url
@@ -270,7 +277,7 @@ async function renderOverview(el) {
         <h2 id="ov-apps">Apps</h2>
         <a href="#apps">Alle apps beheren</a>
       </div>
-      ${appsTable(apps.slice(0, 6), stats.downloads_per_app)}
+      ${appsTable(storeFirst(apps).slice(0, 6), stats.downloads_per_app)}
     </section>
 
     <div class="grid-2">
@@ -322,9 +329,9 @@ function appsTable(apps, downloadsPerApp = {}) {
           <th scope="col">Bijgewerkt</th><th scope="col" class="num">Downloads</th><th scope="col" class="num">Acties</th>
         </tr></thead>
         <tbody>
-          ${apps.map(a => `
-            <tr>
-              <td><div class="app-cell">${appIcon(a)}<div><div class="t">${esc(a.name)}</div><div class="s">${esc(a.tagline || a.slug)}</div></div></div></td>
+          ${storeFirst(apps).map(a => `
+            <tr${isStoreApp(a) ? ' class="row-core"' : ''}>
+              <td><div class="app-cell">${appIcon(a)}<div><div class="t">${esc(a.name)} ${isStoreApp(a) ? `<span class="pill pill-core">${PIN_SVG}Appstore</span>` : ''}</div><div class="s">${esc(a.tagline || a.slug)}</div></div></div></td>
               <td>${a.latest ? esc(a.latest.version_name) : '<span style="color:var(--muted)">Geen APK</span>'}</td>
               <td><span class="pill pill-${esc(a.status)}">${esc(STATUS_LABEL[a.status] || a.status)}</span></td>
               <td style="color:var(--ink-2)">${fmtDate(a.latest ? a.latest.created_at : a.updated_at)}</td>
@@ -346,18 +353,56 @@ async function renderApps(el) {
   drawApps(el);
 }
 
+function storeCard() {
+  const s = state.apps.find(isStoreApp);
+  if (!s) return `
+    <section class="card card-core" aria-labelledby="core-t">
+      <div class="core-head">
+        <span class="app-icon" style="background:#12285A" aria-hidden="true">S</span>
+        <div class="grow"><h2 id="core-t">${PIN_SVG} De appstore staat nog niet in Beheer</h2>
+          <p class="core-sub">Zet Spark Apps (<code>${STORE_PKG}</code>) hier neer. Dan kun je de store updaten en werkt de downloadknop op de website.</p></div>
+        <button type="button" class="btn btn-primary" data-action="add-store">Appstore toevoegen</button>
+      </div>
+    </section>`;
+  const v = s.latest;
+  return `
+    <section class="card card-core" aria-labelledby="core-t">
+      <div class="core-head">
+        ${appIcon(s)}
+        <div class="grow">
+          <h2 id="core-t">${esc(s.name)} <span class="pill pill-core">${PIN_SVG}Vastgezet · de appstore</span></h2>
+          <p class="core-sub">Hiermee installeren en updaten mensen alle andere apps. Hij blijft altijd live en kan niet verwijderd worden.</p>
+        </div>
+      </div>
+      <div class="core-facts">
+        <div><span>Versie</span><b>${v ? `${esc(v.version_name)} <small>(code ${esc(v.version_code)})</small>` : 'Nog geen APK'}</b></div>
+        <div><span>Status</span><b><span class="pill pill-${esc(s.status)}">${esc(STATUS_LABEL[s.status] || s.status)}</span></b></div>
+        <div><span>Bijgewerkt</span><b>${fmtDate(v ? v.created_at : s.updated_at)}</b></div>
+        <div><span>Downloads</span><b>${fmtNumber(state.stats?.downloads_per_app?.[s.id] || 0)}</b></div>
+      </div>
+      ${s.status !== 'live' ? `<div class="banner banner-error"><span><strong>De appstore staat niet live.</strong> Niemand kan hem nu downloaden. Zet hem via Bewerken weer op Live.</span></div>` : ''}
+      <div class="row">
+        <button type="button" class="btn btn-primary" data-action="new-version" data-id="${esc(s.id)}">Store-update publiceren</button>
+        <button type="button" class="btn" data-action="edit-page" data-id="${esc(s.id)}">Store-pagina</button>
+        <button type="button" class="btn btn-link" data-action="edit-app" data-id="${esc(s.id)}">Bewerken</button>
+      </div>
+    </section>`;
+}
+
 function drawApps(el) {
   const q = state.appSearch.toLowerCase();
-  const list = state.apps.filter(a =>
+  const others = state.apps.filter(a => !isStoreApp(a));
+  const list = others.filter(a =>
     (state.appFilter === 'alle' || a.status === state.appFilter) &&
     (!q || a.name.toLowerCase().includes(q) || a.slug.includes(q)));
-  const count = s => state.apps.filter(a => s === 'alle' || a.status === s).length;
+  const count = s => others.filter(a => s === 'alle' || a.status === s).length;
 
   el.innerHTML = `
     <header class="page-head">
       <div><h1>Apps</h1><p class="lead">Wat er in de Spark-appstore staat.</p></div>
       <button type="button" class="btn btn-primary" data-action="new-app">+ Nieuwe app</button>
     </header>
+    ${storeCard()}
     <section class="card" aria-label="Lijst met apps">
       <div class="card-head">
         <div class="filters" role="group" aria-label="Filter op status">
@@ -382,11 +427,12 @@ function drawApps(el) {
   });
 }
 
-function openAppDialog(app) {
+function openAppDialog(app, preset) {
   const dlg = $('#dlg-app');
   const form = $('#form-app');
   form.reset();
   showError(form, '');
+  if (!app && preset) app = { ...preset, id: '' };
   $('#dlg-app-title').textContent = app ? `${app.name} bewerken` : 'Nieuwe app';
   form.id.value = app?.id || '';
   form.icon_url.value = app?.icon_url || '';
@@ -399,7 +445,13 @@ function openAppDialog(app) {
   form.status.value = app?.status || 'concept';
   form.sort_order.value = app?.sort_order ?? state.apps.length;
   form.color.value = app?.color || '#2F4BFF';
-  $('[data-action=delete-app]', form).hidden = !app;
+  const core = isStoreApp(app);
+  form.dataset.core = core ? '1' : '';
+  $('[data-action=delete-app]', form).hidden = !app?.id || core;
+  form.package_name.readOnly = core;
+  $$('option', form.status).forEach(o => { o.disabled = core && o.value !== 'live'; });
+  if (core) form.status.value = 'live';
+  $('#app-core-note').hidden = !core;
   dlg.showModal();
   form.name.focus();
 }
@@ -421,6 +473,8 @@ $('#form-app').addEventListener('submit', async e => {
   const pkg = form.package_name.value.trim();
   if (pkg && !/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(pkg)) return showError(form, 'Het Android-pakket ziet er niet goed uit. Voorbeeld: nl.thomas.potje');
   if (icon && icon.size > 1048576) return showError(form, 'Het icoon is groter dan 1 MB.');
+  if (form.dataset.core && pkg !== STORE_PKG) return showError(form, `Het pakket van de appstore moet ${STORE_PKG} blijven.`);
+  if (form.dataset.core && form.status.value !== 'live') return showError(form, 'De appstore moet live blijven, anders kan niemand hem downloaden.');
   showError(form, '');
   await busy($('button[type=submit]', form), async () => {
     try {
@@ -1143,6 +1197,11 @@ document.addEventListener('click', async e => {
       openAppDialog(null);
       break;
 
+    case 'add-store':
+      openAppDialog(null, { name: 'Spark Apps', slug: 'spark-apps', package_name: STORE_PKG, status: 'live', color: '#12285A', sort_order: 0,
+        tagline: 'Alle Spark-apps, updates en je account' });
+      break;
+
     case 'edit-app':
       openAppDialog(state.apps.find(a => a.id === id));
       break;
@@ -1154,6 +1213,7 @@ document.addEventListener('click', async e => {
     case 'delete-app': {
       const form = $('#form-app');
       const app = state.apps.find(a => a.id === form.id.value);
+      if (isStoreApp(app)) { toast('De appstore kan niet verwijderd worden.', true); return; }
       $('#dlg-app').close();
       const ok = await confirmDialog(`${app.name} verwijderen?`, 'De app en al zijn versies (APK\'s) worden definitief verwijderd. Mensen die hem al hebben, houden hem op hun telefoon.', 'Verwijderen');
       if (!ok) return;

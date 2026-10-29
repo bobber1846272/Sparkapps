@@ -348,6 +348,7 @@ function createDemoApi() {
   const storeSettings = {};
 
   const seed = [
+    ['spark-apps', 'Spark Apps', 'Alle Spark-apps, updates en je account', '#12285A', 'live', [['5.0', 37, 1], ['4.8', 35, 4]], 'nl.thomas.sparkapps'],
     ['mexo', 'Mexo', 'Je loon altijd in beeld', '#2F4BFF', 'live', [['2.0.0', 20, 3]]],
     ['tidepool', 'Tidepool', 'Vakantie-uitgaven eerlijk verdelen', '#0E9F8E', 'live', [['1.2.0', 3, 6], ['1.1.0', 2, 20]]],
     ['gooi-henk', 'Gooi Henk', 'Hoe ver kun jij Henk gooien?', '#E8590C', 'live', [['1.0.3', 4, 9]]],
@@ -357,10 +358,10 @@ function createDemoApi() {
     ['grondig', 'Grondig', 'Vloeren beoordelen van 1 tot 10', '#4B5563', 'live', [['1.0.0', 1, 8]]],
     ['bastion', 'Bastion', 'Je wachtwoorden, veilig op slot', '#111827', 'concept', [['0.9.0', 1, 2]]],
   ];
-  let apps = seed.map(([slug, name, tagline, color, status, vers], i) => {
+  let apps = seed.map(([slug, name, tagline, color, status, vers, package_name = null], i) => {
     const appId = id();
     return {
-      id: appId, slug, name, tagline, description: '', icon_url: null, color, status,
+      id: appId, slug, name, package_name, tagline, description: '', icon_url: null, color, status,
       sort_order: i, created_at: ago(30 - i), updated_at: ago(vers[0][2]),
       versions: vers.map(([vn, vc, d]) => ({
         id: id(), version_name: vn, version_code: vc, changelog: 'Verbeteringen en kleine fixes.',
