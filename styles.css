@@ -39,7 +39,9 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  caret-color: transparent; /* geen knipperend typstreepje in gewone tekst */
 }
+input, textarea, select, [contenteditable="true"] { caret-color: var(--accent); }
 a { color: var(--accent); }
 a:hover { color: var(--accent-ink); }
 h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; letter-spacing: -0.015em; }
