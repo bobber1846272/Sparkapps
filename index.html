@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -151,6 +151,25 @@
 </dialog>
 
 <!-- Dialoog: nieuwe versie publiceren -->
+<!-- Dialoog: volledige store-pagina van een app -->
+<dialog id="dlg-page" class="dlg-wide" aria-labelledby="dlg-page-title">
+  <form class="dlg" id="form-page" novalidate>
+    <div class="dlg-head">
+      <h2 id="dlg-page-title">Store-pagina</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Sluiten">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="page-body"></div>
+    <p class="error-text" data-error role="alert" hidden></p>
+    <div class="dlg-foot">
+      <span id="page-busy" style="flex:1;color:var(--muted);font-size:14px"></span>
+      <button type="button" class="btn" data-close>Annuleren</button>
+      <button type="submit" class="btn btn-primary">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlg-version" aria-labelledby="dlg-version-title">
   <form class="dlg" method="dialog" id="form-version" novalidate>
     <div class="dlg-head">
@@ -216,6 +235,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=9"></script>
+<script type="module" src="app.js?v=10"></script>
 </body>
 </html>
