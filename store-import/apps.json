@@ -1,0 +1,730 @@
+[
+ {
+  "id": "daybreak",
+  "name": "Daybreak",
+  "pkg": "nl.thomas.vrijedagen",
+  "match": [
+   "Daybreak",
+   "Vrije Dagen"
+  ],
+  "tagline": "Je vrije dagen in één oogopslag",
+  "cat": "Planning",
+  "bg": "#0F7A5C",
+  "bg2": "#08523D",
+  "desc": "Houd bij hoeveel vrije dagen je nog hebt, wanneer je ze opneemt en welke je hebt ingekocht. Je ziet je dagen als tegels, zodat je meteen weet hoe je ervoor staat.",
+  "features": [
+   "Je vrije dagen als tegels",
+   "Kalender met al je verlof",
+   "Feestdagen tellen vanzelf mee",
+   "Aftellen naar je volgende vrije dag",
+   "Standaard en ingekocht apart",
+   "Back-up en terugzetten"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "lock",
+    "text": "Code-slot om de app te beveiligen"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "daybreak_0.jpg",
+    "title": "Je dagen als tegels",
+    "sub": "Zie in één keer hoeveel vrije dagen je nog hebt."
+   },
+   {
+    "file": "daybreak_1.jpg",
+    "title": "Al je verlof op een rij",
+    "sub": "Gepland, opgenomen en aangevraagd netjes bij elkaar."
+   },
+   {
+    "file": "daybreak_2.jpg",
+    "title": "Kalender",
+    "sub": "Al je vrije dagen per maand in beeld."
+   },
+   {
+    "file": "daybreak_3.jpg",
+    "title": "Standaard en ingekocht",
+    "sub": "Je tegoed per soort, met wat er nog over is."
+   }
+  ]
+ },
+ {
+  "id": "orbit",
+  "name": "Orbit",
+  "pkg": "nl.thomas.vastelasten",
+  "match": [
+   "Orbit",
+   "Vaste Lasten"
+  ],
+  "tagline": "Alles wat elke maand terugkomt",
+  "cat": "Geld",
+  "bg": "#2C3790",
+  "bg2": "#1A2161",
+  "desc": "Al je vaste lasten en abonnementen op één plek. Rustig en overzichtelijk, zonder een scherm vol getallen.",
+  "features": [
+   "Wat er elke maand afgaat",
+   "Abonnementen apart in beeld",
+   "Pincode of vingerafdruk",
+   "Vergrendelt vanzelf na 5 minuten",
+   "Back-up en terugzetten"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "lock",
+    "text": "Versleuteld, met pincode of vingerafdruk"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "orbit_0.jpg",
+    "title": "Alles in één getal",
+    "sub": "Wat er elke maand afgaat, rustig in beeld."
+   },
+   {
+    "file": "orbit_1.jpg",
+    "title": "Al je vaste lasten",
+    "sub": "Een overzichtelijke lijst zonder gedoe."
+   },
+   {
+    "file": "orbit_2.jpg",
+    "title": "Snel toevoegen",
+    "sub": "Kies hoe vaak je betaalt, de categorie herkent hij zelf."
+   }
+  ]
+ },
+ {
+  "id": "vakanties",
+  "name": "Mijn Vakanties",
+  "pkg": "",
+  "match": [
+   "Mijn Vakanties"
+  ],
+  "tagline": "Plan je reizen met vrienden en familie",
+  "cat": "Reizen",
+  "bg": "#B85A33",
+  "bg2": "#7E3B20",
+  "desc": "Verzamel per reis de plekken die je wilt zien, plan je routes en houd bij waar je bent geweest en wat je ervan vond.",
+  "features": [
+   "Reizen met data en reisgenoten",
+   "Plekken met foto en route",
+   "Routeplanner met side-quests",
+   "Paklijst en boodschappen",
+   "Reviews van plekken",
+   "Delen via WhatsApp"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "lock",
+    "text": "Pincode om de app te beveiligen"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "globe",
+    "text": "Internet alleen voor adressen, foto's en routes"
+   }
+  ],
+  "shots": [
+   {
+    "file": "vakanties_0.jpg",
+    "title": "Al je reizen",
+    "sub": "Aftellen naar je volgende vakantie."
+   },
+   {
+    "file": "vakanties_1.jpg",
+    "title": "Alles per reis",
+    "sub": "Verblijf, reisgenoten en route op één plek."
+   }
+  ]
+ },
+ {
+  "id": "tidepool",
+  "name": "Tidepool",
+  "pkg": "nl.thomas.potje",
+  "match": [
+   "Tidepool",
+   "Potje"
+  ],
+  "tagline": "Vakantie-uitgaven samen eerlijk verdelen",
+  "cat": "Reizen",
+  "bg": "#0F5C55",
+  "bg2": "#093B36",
+  "desc": "Houd bij wat jullie op vakantie uitgeven en wie wat betaalt. Verdeel gelijk of bijvoorbeeld 70/30, en de app rekent uit wie wie nog moet betalen. Zolang je vakantie loopt, opent de app er meteen in. Daarna gaat hij naar het archief.",
+  "features": [
+   "Verdeel gelijk of bijv. 70/30",
+   "Wie moet wie hoeveel betalen",
+   "Opent altijd in je vakantie",
+   "Uitgaven per dag met dagtotaal",
+   "Overzicht per categorie",
+   "Archief van al je vakanties"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   }
+  ],
+  "shots": [
+   {
+    "file": "tidepool_0.jpg",
+    "title": "De pot",
+    "sub": "Alle uitgaven per dag, met wie er betaalde."
+   },
+   {
+    "file": "tidepool_1.jpg",
+    "title": "Afrekenen",
+    "sub": "Precies wie wie hoeveel moet overmaken."
+   },
+   {
+    "file": "tidepool_2.jpg",
+    "title": "Overzicht",
+    "sub": "Zie waar het geld heen ging."
+   }
+  ]
+ },
+ {
+  "id": "belnotities",
+  "name": "Belnotities",
+  "pkg": "nl.thomas.belnotities",
+  "match": [
+   "Belnotities"
+  ],
+  "tagline": "Snelle notities tijdens klantgesprekken",
+  "cat": "Werk",
+  "bg": "#0B1B3A",
+  "bg2": "#1A3470",
+  "desc": "Gemaakt voor aan de telefoon met klanten. Eén tik en je zit in een nieuwe notitie, met datum en tijd er automatisch bij. Geen losse papiertjes meer waarvan je niet weet van wanneer ze zijn.",
+  "features": [
+   "Nieuwe notitie in één tik",
+   "Datum en tijd automatisch",
+   "Vervoerder in één tik",
+   "Ordernummer en klantnaam",
+   "Zoeken en filteren",
+   "Afvinken als het klaar is",
+   "Slaat vanzelf op",
+   "Snelkoppeling vanaf je startscherm"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "belnotities_0.jpg",
+    "title": "Notities per dag",
+    "sub": "Met tijd, vervoerder en ordernummer."
+   },
+   {
+    "file": "belnotities_1.jpg",
+    "title": "Snel invullen",
+    "sub": "Vervoerder in één tik, terwijl je aan de lijn hangt."
+   }
+  ]
+ },
+ {
+  "id": "mexo",
+  "name": "Mexo",
+  "pkg": "nl.thomas.mexo2",
+  "match": [],
+  "tagline": "Weet wat je verdient, en of je loonstrook klopt",
+  "cat": "Geld",
+  "bg": "#2B3A12",
+  "bg2": "#0D1014",
+  "desc": "Zet je diensten erin en Mexo rekent uit wat je verdient, met avond-, zondag- en feestdagtoeslag erbij. Je ziet wat je netto ongeveer krijgt en wanneer het binnenkomt. Komt je loonstrook binnen, dan check je in één keer of het klopt.",
+  "features": [
+   "Diensten in een paar tikken",
+   "Toeslagen automatisch",
+   "Verwacht netto per periode",
+   "Loonstrookcheck",
+   "Per maand of per 4 weken",
+   "Vakantiegeld bijhouden",
+   "Pincode en vingerafdruk",
+   "Donker en licht thema"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "lock",
+    "text": "Beveiligd met pincode of vingerafdruk"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "mexo_0.jpg",
+    "title": "Overzicht",
+    "sub": "Verwacht netto, uitbetaaldag en je toeslagen."
+   },
+   {
+    "file": "mexo_1.jpg",
+    "title": "Diensten",
+    "sub": "Je week in één oogopslag, gewerkt en gepland."
+   },
+   {
+    "file": "mexo_2.jpg",
+    "title": "Loonstrookcheck",
+    "sub": "Zie meteen of je loonstrook klopt."
+   }
+  ]
+ },
+ {
+  "id": "bastion",
+  "name": "Bastion",
+  "pkg": "nl.thomas.bastion",
+  "match": [],
+  "tagline": "Al je wachtwoorden achter slot en grendel",
+  "cat": "Veiligheid",
+  "bg": "#17408A",
+  "bg2": "#0B1024",
+  "desc": "Een wachtwoordmanager die je telefoon nooit verlaat. Bastion heeft geen internettoegang, versleutelt je kluis met een sleutel uit de beveiligde chip van je telefoon en gaat op slot zodra je scherm uitgaat. Maak sterke wachtwoorden met de generator en zie in één oogopslag welke wachtwoorden zwak, hergebruikt of oud zijn.",
+  "features": [
+   "Versleutelde kluis",
+   "Ontgrendelen met vingerafdruk",
+   "Sterke wachtwoorden maken",
+   "Controle op zwak en hergebruikt",
+   "Categorieën en favorieten",
+   "Schermafbeeldingen geblokkeerd",
+   "Op slot bij scherm uit",
+   "Versleutelde back-up"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "wifi",
+    "text": "Geen internettoegang: niks kan je telefoon verlaten"
+   },
+   {
+    "icon": "lock",
+    "text": "Hoofdwachtwoord en vingerafdruk"
+   },
+   {
+    "icon": "phone",
+    "text": "Kluis alleen te openen op deze telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   }
+  ],
+  "shots": [
+   {
+    "file": "bastion_1.jpg",
+    "title": "Je kluis",
+    "sub": "Al je logins op één plek, met favorieten bovenaan."
+   },
+   {
+    "file": "bastion_2.jpg",
+    "title": "Generator",
+    "sub": "Een sterk wachtwoord in één tik."
+   },
+   {
+    "file": "bastion_3.jpg",
+    "title": "Controle",
+    "sub": "Zie welke wachtwoorden beter kunnen."
+   },
+   {
+    "file": "bastion_0.jpg",
+    "title": "Op slot",
+    "sub": "Ontgrendel met je hoofdwachtwoord of vingerafdruk."
+   }
+  ]
+ },
+ {
+  "id": "grondig",
+  "name": "Grondig",
+  "pkg": "nl.thomas.grondig",
+  "match": [],
+  "tagline": "Elke vloer verdient een oordeel",
+  "cat": "Fun-apps",
+  "bg": "#7C4F25",
+  "bg2": "#2A1D12",
+  "desc": "Ga ergens liggen en geef de vloer een cijfer van 1 tot 10. Grondig houdt de ranking bij, van die heerlijke badkamer met vloerverwarming tot de kantine op je werk, en geeft bij elk cijfer een eerlijk oordeel. Af en toe komt Henk langs, de vloerinspecteur. Hij danst, houdt een praatje of gooit je ranking door elkaar.",
+  "features": [
+   "Vloeren keuren van 1 tot 10",
+   "Ranking met een nummer 1",
+   "Eerlijk oordeel bij elk cijfer",
+   "Henk de vloerinspecteur",
+   "Zelf kiezen hoe vaak Henk langskomt",
+   "Ranking delen",
+   "Back-up maken en terugzetten"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "grondig_0.jpg",
+    "title": "De ranking",
+    "sub": "Met Henk, die af en toe komt inspecteren."
+   },
+   {
+    "file": "grondig_1.jpg",
+    "title": "Het oordeel",
+    "sub": "Elk cijfer krijgt een eerlijke uitspraak."
+   },
+   {
+    "file": "grondig_2.jpg",
+    "title": "Vloer keuren",
+    "sub": "Naam, soort en een cijfer. Klaar."
+   },
+   {
+    "file": "grondig_3.jpg",
+    "title": "Opstarten",
+    "sub": "Henk staat klaar met zijn klembord."
+   }
+  ]
+ },
+ {
+  "id": "coinwise",
+  "name": "Coinwise",
+  "pkg": "nl.thomas.coinwise",
+  "match": [],
+  "tagline": "Leer omgaan met geld, door het gewoon te doen",
+  "cat": "Leren",
+  "bg": "#0B6E6D",
+  "bg2": "#13203A",
+  "desc": "Coinwise leert kinderen en jongeren omgaan met geld. Korte lessen voor Junior, Tiener en Starter, met bedragen van 2026. Speel een maand rond met zakgeld, een bijbaan of je eerste salaris. In de oefenbank zie je hoe een echte bankapp werkt: inloggen, betalen, overmaken en sparen, met nepgeld. Voor in de klas is er een klasspel dat de leraar opent met een code.",
+  "features": [
+   "Korte lessen per leeftijd",
+   "Rondkomen-spellen",
+   "Oefenbank die werkt als een echte bankapp",
+   "Vrije modus in de oefenbank",
+   "Spaardoelen",
+   "Klasspel met leraarscode",
+   "XP, muntjes en een reeks"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "coinwise_0.jpg",
+    "title": "Leren",
+    "sub": "Korte lessen, verder waar je was."
+   },
+   {
+    "file": "coinwise_1.jpg",
+    "title": "Oefenbank",
+    "sub": "Een bankapp om mee te oefenen, met nepgeld."
+   },
+   {
+    "file": "coinwise_2.jpg",
+    "title": "Oefenen",
+    "sub": "Kom jij rond deze maand?"
+   },
+   {
+    "file": "coinwise_3.jpg",
+    "title": "Doelen",
+    "sub": "Spaar voor iets wat je echt wilt."
+   }
+  ]
+ },
+ {
+  "id": "gooihenk",
+  "name": "Gooi Henk",
+  "pkg": "nl.thomas.gooihenk",
+  "match": [
+   "Gooi Henk"
+  ],
+  "tagline": "Hoe ver krijg jij Henk?",
+  "cat": "Fun-apps",
+  "bg": "#E8891C",
+  "bg2": "#5A2A08",
+  "desc": "Schiet Henk met een kanon zo ver mogelijk weg en geef hem onderweg een duwtje. Speel het verhaal van Graaiman Bouw BV in levels met sterren, of ga in Vrij gooien voor je record. Met je muntjes koop je upgrades, outfits en nieuwe lanceerders.",
+  "features": [
+   "Verhaalmodus met levels en sterren",
+   "Vrij gooien voor je record",
+   "Upgrades kopen",
+   "Outfits en lanceerders",
+   "18 badges",
+   "Opdrachten met beloningen"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "gooihenk_0.jpg",
+    "title": "Het menu",
+    "sub": "Verhaal, vrij gooien en opdrachten."
+   },
+   {
+    "file": "gooihenk_1.jpg",
+    "title": "Vliegen",
+    "sub": "Henk gaat. Tik voor een duwtje."
+   },
+   {
+    "file": "gooihenk_2.jpg",
+    "title": "Boef!",
+    "sub": "Hoe ver komt hij deze keer?"
+   }
+  ]
+ },
+ {
+  "id": "henkherstelt",
+  "name": "Henk Herstelt",
+  "pkg": "nl.thomas.henkherstelt",
+  "match": [
+   "Henk Herstelt"
+  ],
+  "tagline": "Na de worp: zorg dat Henk weer opknapt",
+  "cat": "Fun-apps",
+  "bg": "#1F8A72",
+  "bg2": "#0D2B24",
+  "desc": "Het vervolg op Gooi Henk. Na al die vluchten uit het kanon is Henk niet helemaal heel meer, en Graaiman Bouw BV heeft hem in de ziektewet gezet. Jij zorgt voor hem: wondjes verzorgen, eten, wassen, slapen en spelen. Doe klusjes, haal je dagelijkse beloning en koop spullen in de winkel.",
+  "features": [
+   "Henk verzorgen tot hij hersteld is",
+   "Eten, wassen, slapen en spelen",
+   "Klusjes en dagelijkse beloning",
+   "Prijzen en een winkel",
+   "Mini-spelletjes",
+   "Vervolg op Gooi Henk"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "henkherstelt_0.jpg",
+    "title": "Henk Herstelt",
+    "sub": "Het vervolg op Gooi Henk."
+   },
+   {
+    "file": "henkherstelt_1.jpg",
+    "title": "Thuis bij Henk",
+    "sub": "Houd zijn buik, energie, hygiëne en humeur op peil."
+   },
+   {
+    "file": "henkherstelt_2.jpg",
+    "title": "Het verhaal",
+    "sub": "Graaiman Bouw BV zette hem in de ziektewet."
+   }
+  ]
+ },
+ {
+  "id": "muse",
+  "name": "Muse",
+  "pkg": "nl.spark.muse",
+  "match": [
+   "Muse"
+  ],
+  "tagline": "Chat met je eigen personages",
+  "cat": "Chat",
+  "bg": "#7B3FC4",
+  "bg2": "#1A0E33",
+  "desc": "Maak je eigen characters of kies er een, en begin een gesprek, alleen of in een groep. De AI draait op je telefoon zelf: geen account, geen abonnement, geen server. Je downloadt één keer een AI-model, daarna werkt alles offline.",
+  "features": [
+   "Eigen characters maken",
+   "Kant-en-klare characters",
+   "Groepsgesprekken",
+   "Antwoord opnieuw laten maken of doorgaan",
+   "AI draait op je telefoon",
+   "Werkt offline na één download"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gesprekken blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Internet alleen om het AI-model te downloaden"
+   }
+  ],
+  "shots": [
+   {
+    "file": "muse_0.jpg",
+    "title": "Chatten",
+    "sub": "Gesprekken met je eigen characters."
+   },
+   {
+    "file": "muse_1.jpg",
+    "title": "Je chats",
+    "sub": "Alleen of in een groep."
+   },
+   {
+    "file": "muse_2.jpg",
+    "title": "Characters",
+    "sub": "Kies er een of maak je eigen."
+   },
+   {
+    "file": "muse_3.jpg",
+    "title": "Welkom",
+    "sub": "De AI draait gewoon op je telefoon."
+   }
+  ]
+ },
+ {
+  "id": "gerard",
+  "name": "Gerard's Imperium",
+  "pkg": "com.sparkapps.gerard",
+  "match": [
+   "Gerard's Imperium"
+  ],
+  "tagline": "Bouw Graaiman Bouw BV uit tot een imperium",
+  "cat": "Fun-apps",
+  "bg": "#B8891A",
+  "bg2": "#1A1408",
+  "desc": "Speel als Gerard Graaiman, de baas van Henk. Tik voor munten, bouw van schuurtje tot kantoorpand, huur werknemers in voor passief inkomen en verover stad na stad, van IJsselstein tot ver daarbuiten. Met slinkse upgrades en een doorstart groeit je imperium steeds sneller.",
+  "features": [
+   "Tikken voor munten",
+   "Bouwprojecten en mijlpalen",
+   "Steden veroveren op de kaart",
+   "Werknemers voor passief inkomen",
+   "Slinkse upgrades",
+   "Doorstart voor meer groei",
+   "Uit de wereld van Henk"
+  ],
+  "made": "2026",
+  "privacy": [
+   {
+    "icon": "phone",
+    "text": "Gegevens blijven op je telefoon"
+   },
+   {
+    "icon": "user",
+    "text": "Geen account nodig"
+   },
+   {
+    "icon": "wifi",
+    "text": "Werkt zonder internet"
+   }
+  ],
+  "shots": [
+   {
+    "file": "gerard_0.jpg",
+    "title": "Bouwen",
+    "sub": "Tik op Gerard en bouw je bedrijf uit."
+   },
+   {
+    "file": "gerard_1.jpg",
+    "title": "De kaart",
+    "sub": "Verover stad na stad."
+   },
+   {
+    "file": "gerard_2.jpg",
+    "title": "Upgrades",
+    "sub": "Goedkoop cement, onbetaalde overuren…"
+   },
+   {
+    "file": "gerard_3.jpg",
+    "title": "Team",
+    "sub": "Huur werknemers in. Henk ook."
+   }
+  ]
+ }
+]

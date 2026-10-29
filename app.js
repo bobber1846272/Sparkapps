@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi } from './api.js?v=9';
+import { createApi } from './api.js?v=10';
 
 // =============================================================
 //  Hulpjes
@@ -331,6 +331,7 @@ function appsTable(apps, downloadsPerApp = {}) {
               <td class="num">${fmtNumber(downloadsPerApp[a.id] || 0)}</td>
               <td class="actions">
                 <button type="button" class="btn btn-sm" data-action="new-version" data-id="${esc(a.id)}" aria-label="Update publiceren voor ${esc(a.name)}">Update</button>
+                <button type="button" class="btn btn-sm" data-action="edit-page" data-id="${esc(a.id)}" aria-label="Store-pagina van ${esc(a.name)}">Store-pagina</button>
                 <button type="button" class="btn btn-sm btn-link" data-action="edit-app" data-id="${esc(a.id)}" aria-label="${esc(a.name)} bewerken">Bewerken</button>
               </td>
             </tr>`).join('')}
@@ -430,8 +431,14 @@ $('#form-app').addEventListener('submit', async e => {
         color: form.color.value, icon_url: form.icon_url.value || null, iconFile: icon || null,
       });
       $('#dlg-app').close();
-      toast(form.id.value ? 'App opgeslagen' : 'App toegevoegd');
-      refreshData();
+      const isNew = !form.id.value;
+      toast(isNew ? 'App toegevoegd. Vul nu de store-pagina in' : 'App opgeslagen');
+      await refreshData();
+      if (isNew) {
+        if (!state.apps.some(a => a.slug === slug)) state.apps = await api.listApps();
+        const fresh = state.apps.find(a => a.slug === slug);
+        if (fresh) openPageDialog(fresh);
+      }
     } catch (err) {
       showError(form, err.message);
     }
@@ -790,6 +797,168 @@ async function renderServer(el) {
 }
 
 // =============================================================
+//  STORE-PAGINA: alles wat er in de Spark-appstore over een app staat
+//  (ondertitel, Over deze app, categorie, kleuren, functies,
+//   gegevensbeveiliging, jaar, screenshots met bijschrift)
+// =============================================================
+const PRIV_ICONS = [['phone', 'Telefoon'], ['lock', 'Slot'], ['user', 'Geen account'], ['wifi', 'Zonder internet'], ['globe', 'Online']];
+const PRIV_PRESETS = [
+  ['phone', 'Gegevens blijven op je telefoon'], ['lock', 'Beveiligd met een code of vingerafdruk'],
+  ['user', 'Geen account nodig'], ['wifi', 'Werkt zonder internet'], ['globe', 'Synchroniseert met je Spark Account'],
+];
+let storeImport = null;                      // huidige inhoud van de store-app, om mee te beginnen
+async function loadStoreImport() {
+  if (storeImport) return storeImport;
+  try { const r = await fetch('store-import/apps.json', { cache: 'no-cache' }); storeImport = r.ok ? await r.json() : []; }
+  catch { storeImport = []; }
+  return storeImport;
+}
+const normName = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function findImport(app) {
+  return (storeImport || []).find(x => (app.package_name && x.pkg === app.package_name)
+    || normName(x.name) === normName(app.name) || (x.match || []).some(m => normName(m) === normName(app.name))
+    || normName(x.id) === normName(app.slug)) || null;
+}
+function darkerHex(hex) {
+  const n = parseInt(String(hex || '#2F4BFF').slice(1), 16) || 0;
+  const d = x => Math.round(x * 0.62).toString(16).padStart(2, '0');
+  return '#' + d((n >> 16) & 255) + d((n >> 8) & 255) + d(n & 255);
+}
+const pg = { app: null, data: null, imported: false };
+
+async function openPageDialog(app) {
+  await loadStoreImport();
+  const d = app.details && app.details.v ? app.details : null;
+  const imp = d ? null : findImport(app);
+  pg.app = app; pg.imported = !!imp;
+  pg.data = {
+    tagline: app.tagline || (imp && imp.tagline) || '',
+    description: app.description || (imp && imp.desc) || '',
+    cat: (d && d.cat) || (imp && imp.cat) || '',
+    bg: (d && d.bg) || (imp && imp.bg) || app.color || '#2F4BFF',
+    bg2: (d && d.bg2) || (imp && imp.bg2) || darkerHex(app.color),
+    made: (d && d.made) || (imp && imp.made) || String(new Date().getFullYear()),
+    features: ((d && d.features) || (imp && imp.features) || []).slice(),
+    privacy: ((d && d.privacy) || (imp && imp.privacy) || []).map(p => ({ ...p })),
+    shots: d ? (d.shots || []).map(s => ({ ...s }))
+      : imp ? imp.shots.map(s => ({ importUrl: 'store-import/shots/' + s.file, title: s.title, sub: s.sub })) : [],
+  };
+  $('#dlg-page-title').textContent = `Store-pagina · ${app.name}`;
+  showError($('#form-page'), ''); $('#page-busy').textContent = '';
+  drawPage();
+  $('#dlg-page').showModal();
+}
+
+function shotSrc(s) { return s.url || s.preview || s.importUrl || ''; }
+
+function drawPage() {
+  const p = pg.data, a = pg.app;
+  const cats = [...new Set([...(storeImport || []).map(x => x.cat), ...state.apps.map(x => x.details && x.details.cat)].filter(Boolean))].sort();
+  $('#page-body').innerHTML = `
+    ${pg.imported ? `<div class="banner"><span><strong>Overgenomen uit de store.</strong> Dit is wat er nu in de store-app staat. Klik op Opslaan om het in Beheer te zetten; daarna pas je het hier aan.</span></div>` : ''}
+    <div class="pg-preview" style="background:linear-gradient(135deg, ${esc(p.bg)}, ${esc(p.bg2)})">
+      ${appIcon(a)}<div><b>${esc(a.name)}</b><span>${esc(p.tagline || 'Ondertitel van de app')}</span></div>
+    </div>
+    <div class="pg-sec">
+      <h3>Over de app</h3>
+      <label class="field"><span>Ondertitel</span><input type="text" maxlength="80" data-pg="tagline" value="${esc(p.tagline)}" placeholder="Eén zin over de app"></label>
+      <label class="field"><span>Over deze app</span><textarea rows="4" maxlength="2000" data-pg="description" placeholder="Wat doet de app en voor wie is hij?">${esc(p.description)}</textarea></label>
+      <div class="form-grid">
+        <label class="field"><span>Categorie</span><input type="text" maxlength="24" list="cat-list" data-pg="cat" value="${esc(p.cat)}" placeholder="Bijv. Geld, Planning, Fun-apps">
+          <datalist id="cat-list">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+        <label class="field"><span>Gemaakt in</span><input type="text" maxlength="4" inputmode="numeric" data-pg="made" value="${esc(p.made)}"></label>
+        <label class="field"><span>Kleur boven</span><input type="color" data-pg="bg" value="${esc(p.bg)}"></label>
+        <label class="field"><span>Kleur onder</span><input type="color" data-pg="bg2" value="${esc(p.bg2)}"></label>
+      </div>
+    </div>
+    <div class="pg-sec">
+      <h3>Wat kan hij</h3>
+      <p class="hint">Eén functie per regel, kort en krachtig. Maximaal 10.</p>
+      <textarea rows="5" data-pg="features" placeholder="Diensten in een paar tikken&#10;Toeslagen automatisch">${esc(p.features.join('\n'))}</textarea>
+    </div>
+    <div class="pg-sec">
+      <h3>Gegevensbeveiliging</h3>
+      <div class="list" style="gap:8px">
+        ${p.privacy.map((x, i) => `
+          <div class="pg-row">
+            <select data-pg="priv-icon" data-i="${i}" aria-label="Icoon">${PRIV_ICONS.map(([v, l]) => `<option value="${v}" ${x.icon === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <input type="text" maxlength="60" data-pg="priv-text" data-i="${i}" value="${esc(x.text)}">
+            <button type="button" class="btn btn-sm btn-danger" data-action="pg-priv-del" data-id="${i}">Weg</button>
+          </div>`).join('') || '<p class="empty" style="text-align:left;padding:0">Nog niks. Kies hieronder wat past.</p>'}
+      </div>
+      <div class="filters">${PRIV_PRESETS.filter(([, t]) => !p.privacy.some(x => x.text === t)).map(([ic, t]) => `<button type="button" class="chip" data-action="pg-priv-add" data-value="${ic}|${esc(t)}">+ ${esc(t)}</button>`).join('')}
+        <button type="button" class="chip" data-action="pg-priv-add" data-value="phone|">+ Eigen regel</button></div>
+    </div>
+    <div class="pg-sec">
+      <h3>Screenshots <span class="count">${p.shots.length}</span></h3>
+      <p class="hint">Staande schermafbeeldingen (JPG, PNG of WEBP, max. 3 MB). De eerste staat vooraan. Geef elk een korte titel en een zin uitleg.</p>
+      <div class="shots">
+        ${p.shots.map((s, i) => `
+          <div class="shot">
+            <img src="${esc(shotSrc(s))}" alt="">
+            ${s.url ? '' : '<span class="pill pill-new" style="align-self:flex-start">Nieuw</span>'}
+            <input type="text" maxlength="40" placeholder="Titel" data-pg="shot-title" data-i="${i}" value="${esc(s.title)}">
+            <input type="text" maxlength="90" placeholder="Eén zin uitleg" data-pg="shot-sub" data-i="${i}" value="${esc(s.sub)}">
+            <div class="pg-row">
+              <button type="button" class="btn btn-sm" data-action="pg-shot-move" data-id="${i}" data-value="-1" ${i === 0 ? 'disabled' : ''} aria-label="Naar voren">←</button>
+              <button type="button" class="btn btn-sm" data-action="pg-shot-move" data-id="${i}" data-value="1" ${i === p.shots.length - 1 ? 'disabled' : ''} aria-label="Naar achteren">→</button>
+              <button type="button" class="btn btn-sm btn-danger" data-action="pg-shot-del" data-id="${i}">Weg</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <label class="field"><span>Screenshots toevoegen</span><input type="file" id="pg-shot-files" accept="image/jpeg,image/png,image/webp" multiple></label>
+    </div>`;
+}
+
+// typen en kiezen in de store-pagina
+document.addEventListener('input', e => {
+  const t = e.target, k = t.dataset && t.dataset.pg; if (!k || !pg.data) return;
+  const p = pg.data, i = +t.dataset.i;
+  if (k === 'features') p.features = t.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 10);
+  else if (k === 'priv-text') p.privacy[i].text = t.value;
+  else if (k === 'priv-icon') p.privacy[i].icon = t.value;
+  else if (k === 'shot-title') p.shots[i].title = t.value;
+  else if (k === 'shot-sub') p.shots[i].sub = t.value;
+  else p[k] = t.value;
+  if (k === 'tagline' || k === 'bg' || k === 'bg2') {
+    const pv = $('.pg-preview'); if (pv) { pv.style.background = `linear-gradient(135deg, ${p.bg}, ${p.bg2})`; $('span', pv).textContent = p.tagline || 'Ondertitel van de app'; }
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'pg-shot-files' || !pg.data) return;
+  const files = Array.from(e.target.files || []);
+  const bad = files.find(f => !/^image\/(jpeg|png|webp)$/.test(f.type) || f.size > 3145728);
+  if (bad) { showError($('#form-page'), `${bad.name} is geen JPG/PNG/WEBP of groter dan 3 MB.`); return; }
+  if (pg.data.shots.length + files.length > 10) { showError($('#form-page'), 'Maximaal 10 screenshots per app.'); return; }
+  files.forEach(f => pg.data.shots.push({ file: f, preview: URL.createObjectURL(f), title: '', sub: '' }));
+  showError($('#form-page'), ''); drawPage();
+});
+
+$('#form-page').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget, p = pg.data;
+  if (!p.tagline.trim()) return showError(form, 'Vul een ondertitel in.');
+  if (!/^\d{4}$/.test(p.made)) return showError(form, 'Vul bij "Gemaakt in" een jaartal in, bijvoorbeeld 2026.');
+  showError(form, '');
+  const nNew = p.shots.filter(s => !s.url).length;
+  $('#page-busy').textContent = nNew ? `${nNew} screenshot${nNew === 1 ? '' : 's'} uploaden…` : '';
+  await busy($('button[type=submit]', form), async () => {
+    try {
+      await api.saveAppPage(pg.app, {
+        tagline: p.tagline.trim(), description: p.description.trim(),
+        details: { cat: p.cat.trim(), bg: p.bg, bg2: p.bg2, made: p.made, features: p.features,
+          privacy: p.privacy.filter(x => x.text.trim()).map(x => ({ icon: x.icon, text: x.text.trim() })) },
+        shots: p.shots.map(s => ({ ...s, title: (s.title || '').trim(), sub: (s.sub || '').trim() })),
+      });
+      $('#dlg-page').close();
+      toast(`Store-pagina van ${pg.app.name} opgeslagen`);
+      refreshData();
+    } catch (err) { showError(form, err.message); }
+    finally { $('#page-busy').textContent = ''; }
+  });
+});
+
+// =============================================================
 //  STORE: labels, Binnenkort en slideshow in de Spark-appstore
 //  (stond vroeger verstopt in de store-app zelf, achter 5x tikken)
 // =============================================================
@@ -1103,6 +1272,23 @@ document.addEventListener('click', async e => {
     case 'refresh':
       await busy(btn, refreshData);
       break;
+
+    case 'edit-page':
+      try { await openPageDialog(state.apps.find(a => a.id === id)); } catch (err) { toast(err.message, true); }
+      break;
+    case 'pg-priv-add': {
+      const [icon, ...t] = value.split('|');
+      pg.data.privacy.push({ icon, text: t.join('|') }); drawPage();
+      if (!t.join('')) $$('[data-pg=priv-text]').pop()?.focus();
+      break;
+    }
+    case 'pg-priv-del': pg.data.privacy.splice(+id, 1); drawPage(); break;
+    case 'pg-shot-del': pg.data.shots.splice(+id, 1); drawPage(); break;
+    case 'pg-shot-move': {
+      const l = pg.data.shots, i = +id, j = i + (+value);
+      if (j >= 0 && j < l.length) { [l[i], l[j]] = [l[j], l[i]]; drawPage(); }
+      break;
+    }
 
     case 'store-tab': store.tab = value; drawStore(); break;
     case 'store-save':

@@ -124,6 +124,40 @@ function createLiveApi(supabase) {
       fail(error);
     },
 
+    // ---- Volledige store-pagina van een app (kolom apps.details + map app-shots) ----
+    async saveAppPage(app, page) {
+      const shots = [];
+      for (const [i, s] of page.shots.entries()) {
+        let url = s.url;
+        if (!url) {
+          let blob = s.file;
+          if (!blob && s.importUrl) {
+            const r = await fetch(s.importUrl);
+            if (!r.ok) throw new Error('Screenshot uit de store ophalen mislukt');
+            blob = await r.blob();
+          }
+          const ext = fileExt(s.file ? s.file.name : s.importUrl, 'jpg');
+          const path = `${app.slug}/${Date.now()}-${i}.${ext}`;
+          const { error } = await supabase.storage.from('app-shots')
+            .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+          if (error && /bucket/i.test(error.message)) throw new Error('Voer eerst supabase/store_pages.sql uit in Supabase.');
+          fail(error, 'Screenshot uploaden mislukt');
+          url = supabase.storage.from('app-shots').getPublicUrl(path).data.publicUrl;
+        }
+        shots.push({ url, title: s.title || '', sub: s.sub || '' });
+      }
+      const details = { ...page.details, v: 1, shots };
+      const { error } = await supabase.from('apps')
+        .update({ details, tagline: page.tagline || null, description: page.description || null }).eq('id', app.id);
+      if (error && /details/i.test(error.message)) throw new Error('Voer eerst supabase/store_pages.sql uit in Supabase.');
+      fail(error);
+      // screenshots die je hebt weggehaald ook uit de map halen (mag mislukken)
+      const keep = new Set(shots.map(s => s.url));
+      const gone = ((app.details && app.details.shots) || []).map(s => s.url)
+        .filter(u => u && !keep.has(u)).map(u => (u.split('/object/public/app-shots/')[1] || '')).filter(Boolean).map(decodeURIComponent);
+      if (gone.length) { try { await supabase.storage.from('app-shots').remove(gone); } catch { /* niet erg */ } }
+    },
+
     async deleteApp(app) {
       const paths = app.versions.map(v => v.apk_path);
       const { error } = await supabase.from('apps').delete().eq('id', app.id);
@@ -411,6 +445,15 @@ function createDemoApi() {
         apps.push({ id: id(), slug: input.slug, name: input.name, package_name: input.package_name, tagline: input.tagline, description: input.description, color: input.color, status: input.status, sort_order: input.sort_order || apps.length, icon_url, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), versions: [] });
         addLog('App toegevoegd', input.name);
       }
+    },
+
+    async saveAppPage(app, page) {
+      await wait(300);
+      const a = apps.find(x => x.id === app.id);
+      const shots = page.shots.map(s => ({ url: s.url || (s.file ? URL.createObjectURL(s.file) : s.importUrl), title: s.title || '', sub: s.sub || '' }));
+      a.details = { ...page.details, v: 1, shots };
+      a.tagline = page.tagline; a.description = page.description;
+      addLog('Store-pagina bewerkt', a.name);
     },
 
     async deleteApp(app) {
