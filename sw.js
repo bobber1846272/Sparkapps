@@ -2,7 +2,7 @@
 // Bewaart alleen de "schil" van de app (HTML, CSS, JS, iconen),
 // zodat hij snel opent. Gegevens uit de database worden NOOIT bewaard.
 
-const CACHE = 'spark-beheer-v10';
+const CACHE = 'spark-beheer-v12';
 const SHELL = [
   './',
   './index.html',

@@ -5,6 +5,9 @@
 
 const SUPABASE_JS = 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
+// Alle rechten die een beheerder kan hebben (zelfde lijst als sa_all_perms() in de database)
+export const ALL_PERMS = ['apps', 'store', 'users', 'users_delete', 'announcements', 'trips', 'files', 'server', 'log', 'requests'];
+
 export async function createApi(config) {
   const hasConfig = Boolean(config.SUPABASE_URL && config.SUPABASE_ANON_KEY);
   if (!hasConfig) return createDemoApi();
@@ -156,6 +159,64 @@ function createLiveApi(supabase) {
       const gone = ((app.details && app.details.shots) || []).map(s => s.url)
         .filter(u => u && !keep.has(u)).map(u => (u.split('/object/public/app-shots/')[1] || '')).filter(Boolean).map(decodeURIComponent);
       if (gone.length) { try { await supabase.storage.from('app-shots').remove(gone); } catch { /* niet erg */ } }
+    },
+
+    // ---- Rechten van de ingelogde beheerder (supabase/beheerders_aanvragen.sql) ----
+    async myAccess() {
+      const { data, error } = await supabase.rpc('sa_me');
+      if (error) {
+        // SQL nog niet uitgevoerd: dan werkt Beheer zoals vroeger (alles mag)
+        if (/sa_me|function|schema cache|not find/i.test(error.message)) return { owner: true, role: 'eigenaar', perms: ALL_PERMS, legacy: true };
+        fail(error);
+      }
+      return data || { owner: false, role: null, perms: [] };
+    },
+
+    async listStaff() {
+      const { data, error } = await supabase.rpc('sa_list');
+      fail(error);
+      return data || [];
+    },
+
+    async setStaff(userId, role, perms) {
+      const { error } = await supabase.rpc('sa_set', { p_user: userId, p_role: role, p_perms: perms });
+      fail(error);
+    },
+
+    async removeStaff(userId) {
+      const { error } = await supabase.rpc('sa_remove', { p_user: userId });
+      fail(error);
+    },
+
+    // ---- Aanvragen, foutmeldingen en feedback van de website ----
+    async listRequests() {
+      const { data, error } = await supabase.from('spark_requests')
+        .select('*').order('created_at', { ascending: false }).limit(500);
+      if (error && /spark_requests/i.test(error.message)) throw new Error('Voer eerst supabase/beheerders_aanvragen.sql uit in Supabase.');
+      fail(error);
+      const ids = [...new Set(data.map(r => r.user_id))];
+      let people = [];
+      if (ids.length) {
+        const res = await supabase.from('profiles').select('id, username, display_name, avatar_url').in('id', ids);
+        people = res.data || [];
+      }
+      return data.map(r => ({ ...r, user: people.find(p => p.id === r.user_id) || null }));
+    },
+
+    async updateRequest(id, fields) {
+      const { error } = await supabase.from('spark_requests').update(fields).eq('id', id);
+      fail(error);
+    },
+
+    async deleteRequest(id) {
+      const { error } = await supabase.from('spark_requests').delete().eq('id', id);
+      fail(error);
+    },
+
+    async countNewRequests() {
+      const { count, error } = await supabase.from('spark_requests').select('id', { count: 'exact', head: true }).eq('status', 'nieuw');
+      if (error) return 0;
+      return count || 0;
     },
 
     async deleteApp(app) {
@@ -397,6 +458,22 @@ function createDemoApi() {
     { actor_name: '@beheerder', action: 'App toegevoegd', target: 'Bastion', created_at: ago(9) },
   ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
+  // Rechten. Bekijk de demo als een andere rol met ?als=moderator (of app-beheerder, helpdesk).
+  const asRole = new URLSearchParams(location.search).get('als');
+  const ROLE_DEMO = { 'app-beheerder': ['apps', 'store', 'announcements', 'log'], moderator: ['users', 'trips', 'requests', 'announcements'], helpdesk: ['requests', 'users'] };
+  let staff = [
+    { user_id: 'me', role: 'eigenaar', perms: ALL_PERMS, created_at: ago(30) },
+    { user_id: users[2].id, role: 'moderator', perms: ['users', 'trips', 'requests', 'announcements'], created_at: ago(4) },
+  ];
+  users[2].is_admin = true;
+
+  let requests = [
+    { id: id(), user_id: users[1].id, kind: 'app', app_name: null, title: 'App om boodschappen te verdelen', body: 'Met mijn huisgenoten doen we samen boodschappen. Een app die bijhoudt wie wat betaald heeft en wie er aan de beurt is zou top zijn.', status: 'nieuw', reply: null, replied_at: null, created_at: ago(0, 3) },
+    { id: id(), user_id: users[3].id, kind: 'fout', app_name: 'Mexo', title: 'Nachttoeslag klopt niet na 00:00', body: 'Als mijn dienst over middernacht gaat, telt hij de toeslag maar tot 00:00.', device: 'Samsung Galaxy A54 · Android 14', status: 'bezig', reply: 'Dank je! We kijken ernaar, de fix komt in de volgende update.', replied_at: ago(0, 20), created_at: ago(1, 2) },
+    { id: id(), user_id: users[5].id, kind: 'feedback', app_name: 'Tidepool', title: 'Samen één pot is echt fijn', body: 'Werkte perfect op vakantie. Misschien nog een donkere modus?', status: 'nieuw', reply: null, replied_at: null, created_at: ago(2) },
+    { id: id(), user_id: users[3].id, kind: 'app', app_name: null, title: 'Planner voor sportschema', body: '', status: 'afgewezen', reply: 'Leuk idee, maar dit pakken we voorlopig niet op.', replied_at: ago(6), created_at: ago(8) },
+  ];
+
   const addLog = (action, target) => log.unshift({ actor_name: '@beheerder', action, target, created_at: new Date().toISOString() });
   let signedIn = false;
   const mvPub = [{ trip_id: 'demo1', title: 'Zomer Spanje', location: 'Barcelona', countries: ['es'], places_count: 12, likes: 4, comments: 2, hidden: false, visible: true, published_at: ago(2), owner: { username: 'demo', display_name: 'Demo Gebruiker' } }];
@@ -510,6 +587,56 @@ function createDemoApi() {
       announcements.unshift({ id: id(), message, style: style || 'banner', title, active: true, created_at: new Date().toISOString() });
       addLog('Melding geplaatst', message.slice(0, 80));
     },
+
+
+    async myAccess() {
+      await wait(60);
+      if (asRole && ROLE_DEMO[asRole]) return { owner: false, role: asRole, perms: ROLE_DEMO[asRole] };
+      return { owner: true, role: 'eigenaar', perms: ALL_PERMS };
+    },
+
+    async listStaff() {
+      await wait(100);
+      return staff.map(s => { const u = users.find(x => x.id === s.user_id) || {}; return { ...clone(s), username: u.username, display_name: u.display_name, avatar_url: u.avatar_url || null, is_blocked: !!u.is_blocked }; })
+        .sort((a, b) => (b.role === 'eigenaar') - (a.role === 'eigenaar') || a.created_at.localeCompare(b.created_at));
+    },
+
+    async setStaff(userId, role, perms) {
+      await wait();
+      const u = users.find(x => x.id === userId);
+      if (!u || u.is_blocked) throw new Error('Deze gebruiker bestaat niet of is geblokkeerd.');
+      const s = staff.find(x => x.user_id === userId);
+      if (s && s.role === 'eigenaar') throw new Error('De eigenaar kun je niet wijzigen.');
+      const clean = [...new Set(perms)].filter(p => ALL_PERMS.includes(p)).sort();
+      if (s) Object.assign(s, { role, perms: clean }); else staff.push({ user_id: userId, role, perms: clean, created_at: new Date().toISOString() });
+      u.is_admin = true;
+      addLog(`Beheerder ingesteld (${role})`, '@' + u.username);
+    },
+
+    async removeStaff(userId) {
+      await wait();
+      const s = staff.find(x => x.user_id === userId);
+      if (s && s.role === 'eigenaar') throw new Error('De eigenaar kun je niet weghalen.');
+      staff = staff.filter(x => x.user_id !== userId);
+      const u = users.find(x => x.id === userId); if (u) u.is_admin = false;
+      addLog('Beheerder weggehaald', '@' + (u ? u.username : '?'));
+    },
+
+    async listRequests() {
+      await wait(120);
+      return clone(requests).map(r => { const u = users.find(x => x.id === r.user_id); return { ...r, user: u ? { id: u.id, username: u.username, display_name: u.display_name, avatar_url: null } : null }; });
+    },
+
+    async updateRequest(rid, fields) {
+      await wait();
+      const r = requests.find(x => x.id === rid);
+      if ('reply' in fields && fields.reply !== r.reply) r.replied_at = fields.reply ? new Date().toISOString() : null;
+      Object.assign(r, fields);
+    },
+
+    async deleteRequest(rid) { await wait(); requests = requests.filter(x => x.id !== rid); },
+
+    async countNewRequests() { return requests.filter(r => r.status === 'nieuw').length; },
 
     async deleteUser(userId) {
       await wait();

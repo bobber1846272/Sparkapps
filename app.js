@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { createApi } from './api.js?v=10';
+import { createApi, ALL_PERMS } from './api.js?v=12';
 
 // =============================================================
 //  Hulpjes
@@ -111,6 +111,45 @@ async function busy(button, fn) {
 }
 
 // =============================================================
+//  Rechten
+// =============================================================
+const PERMS = [
+  ['apps', 'Apps en updates', 'Apps toevoegen, APK\'s publiceren en store-pagina\'s bewerken'],
+  ['store', 'Store-instellingen', 'Labels, slideshow en binnenkort in de appstore'],
+  ['announcements', 'Meldingen', 'Een balk of pop-up in de appstore plaatsen'],
+  ['requests', 'Aanvragen en feedback', 'Aanvragen en foutmeldingen van de website beantwoorden'],
+  ['users', 'Gebruikers', 'Accounts bekijken, goedkeuren en blokkeren'],
+  ['users_delete', 'Accounts verwijderen', 'Een account definitief weghalen'],
+  ['trips', 'Reizen', 'Gedeelde reizen en meldingen daarover modereren'],
+  ['files', 'Bestanden', 'De beheermap met bestanden'],
+  ['server', 'Server', 'De status van de server bekijken'],
+  ['log', 'Logboek', 'Zien wie wat gedaan heeft'],
+];
+const PERM_LABEL = Object.fromEntries(PERMS.map(([k, l]) => [k, l]));
+const ROLES = {
+  beheerder: { label: 'Beheerder', perms: ALL_PERMS, desc: 'Alles, behalve beheerders beheren.' },
+  'app-beheerder': { label: 'App-beheerder', perms: ['apps', 'store', 'announcements', 'log'], desc: 'Apps, updates en de store.' },
+  moderator: { label: 'Moderator', perms: ['users', 'trips', 'requests', 'announcements'], desc: 'Gebruikers, reizen en aanvragen.' },
+  helpdesk: { label: 'Helpdesk', perms: ['requests', 'users'], desc: 'Aanvragen beantwoorden en gebruikers opzoeken.' },
+  eigen: { label: 'Eigen keuze', perms: [], desc: 'Jij kiest zelf de vinkjes.' },
+};
+const ROLE_LABEL = r => r === 'eigenaar' ? 'Eigenaar' : (ROLES[r]?.label || 'Geen rol');
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+const isCustomised = (role, perms) => ROLES[role] && role !== 'eigen' && !sameSet([...perms].sort(), [...ROLES[role].perms].sort());
+
+// Welk recht hoort bij welk onderdeel ('owner' = alleen de eigenaar)
+const VIEW_PERM = { overzicht: null, apps: 'apps', gebruikers: 'users', meldingen: 'announcements', store: 'store', aanvragen: 'requests',
+  logboek: 'log', reizen: 'trips', bestanden: 'files', server: 'server', beheerders: 'owner' };
+
+function can(perm) {
+  const a = state.access;
+  if (!perm) return true;
+  if (!a) return false;
+  if (a.owner) return true;
+  return perm !== 'owner' && (a.perms || []).includes(perm);
+}
+
+// =============================================================
 //  Status van de app
 // =============================================================
 let api;
@@ -123,6 +162,11 @@ const state = {
   appSearch: '',
   userSearch: '',
   userFilter: 'alle',
+  access: null,
+  staff: [],
+  requests: [],
+  reqFilter: 'open',
+  reqKind: 'alle',
 };
 
 // =============================================================
@@ -173,7 +217,7 @@ $('#login-form').addEventListener('submit', async e => {
       await api.signIn(email, password);
       state.me = await api.getMe();
       form.password.value = '';
-      enterApp();
+      await enterApp();
     } catch (ex) {
       err.textContent = ex.message;
       err.hidden = false;
@@ -182,10 +226,14 @@ $('#login-form').addEventListener('submit', async e => {
 });
 $$('#login-form input').forEach(i => i.addEventListener('input', () => { $('#login-error').hidden = true; }));
 
-function enterApp() {
+async function enterApp() {
+  try { state.access = await api.myAccess(); }
+  catch { state.access = { owner: false, role: null, perms: [] }; }
   $('#login').hidden = true;
   $('#app').hidden = false;
-  $('#me-name').textContent = '@' + (state.me?.username || 'beheerder');
+  $('#me-name').innerHTML = esc('@' + (state.me?.username || 'beheerder')) +
+    (state.access.role ? ` <span class="pill pill-role">${esc(ROLE_LABEL(state.access.role))}</span>` : '');
+  $$('.nav a').forEach(a => { a.hidden = !can(VIEW_PERM[a.dataset.route]); });
   if (!location.hash) history.replaceState(null, '', '#overzicht');
   route();
 }
@@ -203,6 +251,8 @@ const VIEWS = {
   bestanden: renderFiles,
   reizen: renderTrips,
   store: renderStore,
+  aanvragen: renderRequests,
+  beheerders: renderStaff,
 };
 
 async function route() {
@@ -211,6 +261,11 @@ async function route() {
   const view = VIEWS[name] ? name : 'overzicht';
   $$('.nav a').forEach(a => a.setAttribute('aria-current', a.dataset.route === view ? 'page' : 'false'));
   const el = $('#view');
+  if (!can(VIEW_PERM[view])) {
+    el.innerHTML = `<header class="page-head"><div><h1>Geen toegang</h1><p class="lead">Je hebt geen recht voor dit onderdeel. Vraag de eigenaar als je het nodig hebt.</p></div></header>`;
+    updateCounts();
+    return;
+  }
   try {
     await VIEWS[view](el);
   } catch (err) {
@@ -226,9 +281,13 @@ async function updateCounts() {
     $('#count-apps').textContent = state.stats.apps_total;
     $('#count-users').textContent = state.stats.users_total;
   } catch { /* niet belangrijk */ }
-  try {
+  if (can('trips')) try {
     const r = state.mvReports || await api.mvReports('open');
     state.mvReports = r; $('#count-reports').textContent = r.length || '';
+  } catch { /* tabel bestaat nog niet */ }
+  if (can('requests')) try {
+    const n = await api.countNewRequests();
+    $('#count-requests').textContent = n || '';
   } catch { /* tabel bestaat nog niet */ }
 }
 
@@ -241,11 +300,15 @@ async function refreshData() {
 //  OVERZICHT
 // =============================================================
 async function renderOverview(el) {
-  const [stats, apps, users, log, server] = await Promise.all([
-    api.stats(), api.listApps(), api.listUsers(), api.listLog(6), api.serverStatus(),
+  const none = async () => [];
+  const [stats, apps, users, log, server, requests] = await Promise.all([
+    api.stats(), can('apps') ? api.listApps() : none(), can('users') ? api.listUsers() : none(),
+    can('log') ? api.listLog(6) : none(), can('server') ? api.serverStatus() : none(),
+    can('requests') ? api.listRequests().catch(() => []) : none(),
   ]);
   state.stats = stats; state.apps = apps; state.users = users;
   const backup = server.find(s => /back-up/i.test(s.name));
+  const openReq = requests.filter(r => r.status === 'nieuw' || r.status === 'bekeken' || r.status === 'bezig');
 
   el.innerHTML = `
     <header class="page-head">
@@ -254,53 +317,59 @@ async function renderOverview(el) {
         <p class="lead">Alles van sparkapps.nl op één plek.</p>
       </div>
       <div class="row">
-        ${serverPill(server)}
-        <button type="button" class="btn btn-primary" data-action="new-app">+ Nieuwe app</button>
+        ${can('server') ? serverPill(server) : ''}
+        ${can('apps') ? '<button type="button" class="btn btn-primary" data-action="new-app">+ Nieuwe app</button>' : ''}
       </div>
     </header>
 
+    ${state.access?.legacy ? `<div class="banner"><span><strong>Nog één stap voor subbeheerders.</strong> Voer <code>supabase/beheerders_aanvragen.sql</code> uit in Supabase. Tot die tijd werkt Beheer zoals altijd.</span></div>` : ''}
     ${api.mode === 'demo' ? `<div class="banner"><span><strong>Demo-stand.</strong> Je kijkt naar voorbeeldgegevens. Wijzigingen verdwijnen als je de pagina ververst. Vul <code>config.js</code> in om je echte database te koppelen.</span></div>` : ''}
 
     <section class="stats" aria-label="Kerncijfers">
       ${statCard('Apps in de store', stats.apps_live, `${fmtNumber(stats.apps_concept)} concept · ${fmtNumber(stats.apps_total)} totaal`)}
       ${statCard('Spark Accounts', stats.users_total, `${fmtNumber(stats.users_new_week)} nieuw deze week`)}
       ${statCard('Downloads deze week', stats.downloads_week, stats.top_app_week ? `Meest: ${esc(stats.top_app_week)}` : 'Nog geen downloads')}
-      <div class="stat">
+      ${can('server') ? `<div class="stat">
         <span class="lbl">Laatste back-up</span>
         <span class="val ${backup && backup.state === 'ok' ? 'ok' : ''}">${backup && backup.state === 'ok' ? esc(backup.label) : '—'}</span>
         <span class="sub">${backup ? esc(backup.detail) : 'Nog niet ingesteld'}</span>
-      </div>
+      </div>` : can('requests') ? statCard('Open aanvragen', openReq.length, `${fmtNumber(requests.filter(r => r.status === 'nieuw').length)} nieuw`) : ''}
     </section>
 
-    <section class="card" aria-labelledby="ov-apps">
+    ${can('apps') ? `<section class="card" aria-labelledby="ov-apps">
       <div class="card-head">
         <h2 id="ov-apps">Apps</h2>
         <a href="#apps">Alle apps beheren</a>
       </div>
       ${appsTable(storeFirst(apps).slice(0, 6), stats.downloads_per_app)}
-    </section>
+    </section>` : ''}
 
     <div class="grid-2">
-      <section class="card" aria-labelledby="ov-users">
+      ${can('requests') ? `<section class="card" aria-labelledby="ov-req">
+        <div class="card-head"><h2 id="ov-req">Aanvragen en feedback</h2><a href="#aanvragen">Alles bekijken</a></div>
+        <div class="list">${openReq.slice(0, 4).map(requestRow).join('') || '<p class="empty">Niks open. Lekker bezig!</p>'}</div>
+      </section>` : ''}
+
+      ${can('users') ? `<section class="card" aria-labelledby="ov-users">
         <div class="card-head"><h2 id="ov-users">Nieuwste gebruikers</h2><a href="#gebruikers">Alle gebruikers</a></div>
         <div class="list">${users.slice(0, 4).map(userRow).join('') || '<p class="empty">Nog geen gebruikers.</p>'}</div>
-      </section>
+      </section>` : ''}
 
-      <section class="card" aria-labelledby="ov-server">
+      ${can('server') ? `<section class="card" aria-labelledby="ov-server">
         <div class="card-head"><h2 id="ov-server">Server</h2><a href="#server">Details</a></div>
         <div class="list">${server.map(serverRow).join('')}</div>
-      </section>
+      </section>` : ''}
 
-      <section class="card" aria-labelledby="ov-ann">
+      ${can('announcements') ? `<section class="card" aria-labelledby="ov-ann">
         <h2 id="ov-ann">Melding in de store</h2>
         <p style="color:var(--muted);font-size:14px">Verschijnt bovenaan in de Spark-appstore bij iedereen.</p>
         ${announcementForm('ov')}
-      </section>
+      </section>` : ''}
 
-      <section class="card" aria-labelledby="ov-log">
+      ${can('log') ? `<section class="card" aria-labelledby="ov-log">
         <div class="card-head"><h2 id="ov-log">Logboek</h2><a href="#logboek">Volledig logboek</a></div>
         <div class="list">${log.map(logRow).join('') || '<p class="empty">Nog niks gebeurd.</p>'}</div>
-      </section>
+      </section>` : ''}
     </div>`;
 }
 
@@ -552,9 +621,9 @@ function userRow(u) {
         <span class="t">${esc(u.display_name)} ${u.is_admin ? '<span class="pill pill-admin">Beheerder</span>' : ''} ${u.is_blocked ? '<span class="pill pill-blocked">Geblokkeerd</span>' : ''} ${u.email_confirmed_at ? '' : '<span class="pill pill-concept">Niet bevestigd</span>'}</span>
         <span class="s">@${esc(u.username)} · lid sinds ${fmtDate(u.created_at)}</span>
       </div>
-      ${u.email_confirmed_at ? '' : `<button type="button" class="btn btn-sm btn-primary" data-action="confirm-user" data-id="${esc(u.id)}">Goedkeuren</button>`}
+      ${u.email_confirmed_at || !can('users') ? '' : `<button type="button" class="btn btn-sm btn-primary" data-action="confirm-user" data-id="${esc(u.id)}">Goedkeuren</button>`}
       <button type="button" class="btn btn-sm" data-action="view-user" data-id="${esc(u.id)}">Bekijken</button>
-      ${isMe ? '' : u.is_blocked
+      ${isMe || !can('users') || (u.is_admin && !state.access?.owner) ? '' : u.is_blocked
         ? `<button type="button" class="btn btn-sm" data-action="unblock" data-id="${esc(u.id)}">Deblokkeren</button>`
         : `<button type="button" class="btn btn-sm btn-danger" data-action="block" data-id="${esc(u.id)}">Blokkeren</button>`}
     </div>`;
@@ -610,12 +679,210 @@ function openUserDialog(u) {
       <div class="list-item"><div class="who-block"><span class="s">Status</span><span class="t">${u.is_blocked ? 'Geblokkeerd' : 'Actief'}${u.is_admin ? ' · Beheerder' : ''}</span></div></div>
     </div>
     <div class="dlg-foot">
-      ${u.is_admin || u.username === state.me?.username ? '' : `<button type="button" class="btn btn-danger" data-action="delete-user" data-id="${esc(u.id)}">Account verwijderen</button>`}
+      ${u.is_admin || u.username === state.me?.username || !can('users_delete') ? '' : `<button type="button" class="btn btn-danger" data-action="delete-user" data-id="${esc(u.id)}">Account verwijderen</button>`}
       <span style="flex:1"></span>
+      ${state.access?.owner && u.username !== state.me?.username && !u.is_blocked
+        ? `<button type="button" class="btn" data-action="staff-edit" data-id="${esc(u.id)}">${u.is_admin ? 'Rechten wijzigen' : 'Beheerder maken'}</button>` : ''}
       <button type="button" class="btn" data-action="reset-pw" data-id="${esc(u.id)}">Wachtwoord-reset mailen</button>
     </div>`;
   $('#dlg-user').showModal();
 }
+
+
+// =============================================================
+//  AANVRAGEN (van de website)
+// =============================================================
+const REQ_KIND = { app: 'App-aanvraag', fout: 'Fout', feedback: 'Feedback' };
+const REQ_STATUS = { nieuw: 'Nieuw', bekeken: 'Bekeken', bezig: 'Mee bezig', klaar: 'Klaar', afgewezen: 'Afgewezen' };
+const REQ_PILL = { nieuw: 'pill-admin', bekeken: 'pill-verborgen', bezig: 'pill-concept', klaar: 'pill-live', afgewezen: 'pill-blocked' };
+const REQ_ICON = {
+  app: '<path d="M12 3l2.4 5.6L20 9.2l-4.4 3.9 1.3 5.9L12 16l-4.9 3 1.3-5.9L4 9.2l5.6-.6z"/>',
+  fout: '<path d="M12 8v5M12 16.5v.5"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  feedback: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+};
+const reqIcon = k => `<span class="req-ic req-${esc(k)}" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${REQ_ICON[k] || REQ_ICON.feedback}</svg></span>`;
+
+function requestRow(r) {
+  return `
+    <div class="list-item">
+      ${reqIcon(r.kind)}
+      <div class="who-block">
+        <span class="t">${esc(r.title)}</span>
+        <span class="s">${esc(REQ_KIND[r.kind] || r.kind)}${r.app_name ? ' · ' + esc(r.app_name) : ''} · ${r.user ? '@' + esc(r.user.username) : 'onbekend'} · ${fmtDate(r.created_at)}${r.reply ? ' · beantwoord' : ''}</span>
+      </div>
+      <span class="pill ${REQ_PILL[r.status] || ''}">${esc(REQ_STATUS[r.status] || r.status)}</span>
+      <button type="button" class="btn btn-sm" data-action="req-open" data-id="${esc(r.id)}">Openen</button>
+    </div>`;
+}
+
+async function renderRequests(el) {
+  state.requests = await api.listRequests();
+  drawRequests(el);
+}
+
+function drawRequests(el) {
+  const groups = { open: ['nieuw', 'bekeken', 'bezig'], nieuw: ['nieuw'], klaar: ['klaar', 'afgewezen'], alle: Object.keys(REQ_STATUS) };
+  const inKind = r => state.reqKind === 'alle' || r.kind === state.reqKind;
+  const list = state.requests.filter(r => groups[state.reqFilter].includes(r.status) && inKind(r));
+  const count = g => state.requests.filter(r => groups[g].includes(r.status) && inKind(r)).length;
+  el.innerHTML = `
+    <header class="page-head">
+      <div><h1>Aanvragen</h1><p class="lead">Ideeën voor apps, foutmeldingen en feedback van sparkapps.nl. De afzender ziet je antwoord en de status op zijn account.</p></div>
+    </header>
+    <section class="card" aria-label="Lijst met aanvragen">
+      <div class="card-head">
+        <div class="filters" role="group" aria-label="Filter op status">
+          ${[['open', 'Open'], ['nieuw', 'Nieuw'], ['klaar', 'Afgerond'], ['alle', 'Alles']].map(([v, l]) => `
+            <button type="button" class="chip" data-action="req-filter" data-value="${v}" aria-pressed="${state.reqFilter === v}">${l} (${count(v)})</button>`).join('')}
+        </div>
+        <div class="filters" role="group" aria-label="Filter op soort">
+          ${[['alle', 'Alle soorten'], ['app', 'App-aanvragen'], ['fout', 'Fouten'], ['feedback', 'Feedback']].map(([v, l]) => `
+            <button type="button" class="chip" data-action="req-kind" data-value="${v}" aria-pressed="${state.reqKind === v}">${l}</button>`).join('')}
+        </div>
+      </div>
+      <div class="list">${list.map(requestRow).join('') || '<p class="empty">Niks gevonden.</p>'}</div>
+    </section>`;
+}
+
+function openRequestDialog(r) {
+  const form = $('#form-req');
+  form.reset(); showError(form, '');
+  form.dataset.id = r.id;
+  $('#dlg-req-title').textContent = r.title;
+  $('#req-meta').innerHTML = `
+    <div class="list-item">${reqIcon(r.kind)}<div class="who-block"><span class="t">${esc(REQ_KIND[r.kind] || r.kind)}${r.app_name ? ' · ' + esc(r.app_name) : ''}</span>
+      <span class="s">Van ${r.user ? `${esc(r.user.display_name || r.user.username)} (@${esc(r.user.username)})` : 'onbekend'} · ${fmtDate(r.created_at)}</span></div></div>
+    ${r.body ? `<div class="req-body">${esc(r.body)}</div>` : '<p class="empty" style="margin:0">Geen extra uitleg.</p>'}
+    ${r.device ? `<p class="req-device">Toestel: ${esc(r.device)}</p>` : ''}`;
+  form.status.value = r.status;
+  form.reply.value = r.reply || '';
+  $('#dlg-req').showModal();
+}
+
+$('#form-req').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const r = state.requests.find(x => x.id === form.dataset.id);
+  let status = form.status.value;
+  const reply = form.reply.value.trim();
+  if (reply && status === 'nieuw') status = 'bekeken';
+  await busy($('button[type=submit]', form), async () => {
+    try {
+      await api.updateRequest(r.id, { status, reply: reply || null });
+      $('#dlg-req').close();
+      toast(reply && reply !== (r.reply || '') ? 'Antwoord verstuurd' : 'Opgeslagen');
+      route();
+    } catch (err) { showError(form, err.message); }
+  });
+});
+
+// =============================================================
+//  BEHEERDERS (alleen de eigenaar)
+// =============================================================
+async function renderStaff(el) {
+  const [staff, users] = await Promise.all([api.listStaff(), api.listUsers()]);
+  state.staff = staff; state.users = users;
+  const permChips = perms => perms.length ? perms.map(p => `<span class="perm-chip">${esc(PERM_LABEL[p] || p)}</span>`).join('') : '<span class="perm-chip off">Nog geen rechten</span>';
+  el.innerHTML = `
+    <header class="page-head">
+      <div><h1>Beheerders</h1><p class="lead">Wie mag wat in Beheer. Alleen jij als eigenaar kunt dit aanpassen.</p></div>
+      <button type="button" class="btn btn-primary" data-action="staff-add">+ Beheerder toevoegen</button>
+    </header>
+    <section class="card" aria-label="Lijst met beheerders">
+      <div class="list">
+        ${staff.map(s => `
+          <div class="list-item staff-item">
+            ${avatar({ display_name: s.display_name, username: s.username, avatar_url: s.avatar_url })}
+            <div class="who-block">
+              <span class="t">${esc(s.display_name || s.username)}
+                <span class="pill ${s.role === 'eigenaar' ? 'pill-core' : 'pill-admin'}">${esc(ROLE_LABEL(s.role))}${isCustomised(s.role, s.perms) ? ' · aangepast' : ''}</span>
+                ${s.is_blocked ? '<span class="pill pill-blocked">Geblokkeerd</span>' : ''}</span>
+              <span class="s">@${esc(s.username)}${s.role === 'eigenaar' ? ' · mag alles, ook beheerders beheren' : ''}</span>
+              ${s.role === 'eigenaar' ? '' : `<span class="perm-chips">${permChips(s.perms)}</span>`}
+            </div>
+            ${s.role === 'eigenaar' ? '' : `
+              <button type="button" class="btn btn-sm" data-action="staff-edit" data-id="${esc(s.user_id)}">Rechten</button>
+              <button type="button" class="btn btn-sm btn-danger" data-action="staff-remove" data-id="${esc(s.user_id)}">Weghalen</button>`}
+          </div>`).join('')}
+      </div>
+    </section>
+    <section class="card" aria-labelledby="roles-t">
+      <h2 id="roles-t">De rollen</h2>
+      <p style="color:var(--muted);font-size:14px;margin-top:0">Een rol zet de vinkjes voor je aan. Per persoon kun je daarna nog vinkjes aan- of uitzetten.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Rol</th>${PERMS.map(([k, l]) => `<th scope="col" class="perm-col">${esc(l)}</th>`).join('')}</tr></thead>
+        <tbody>${Object.entries(ROLES).filter(([k]) => k !== 'eigen').map(([k, r]) => `
+          <tr><td><b>${esc(r.label)}</b><div class="s" style="color:var(--muted);font-size:13px">${esc(r.desc)}</div></td>
+            ${PERMS.map(([p]) => `<td class="perm-col">${r.perms.includes(p) ? '<span class="yes" aria-label="ja">✓</span>' : '<span class="no" aria-label="nee">–</span>'}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table></div>
+    </section>`;
+}
+
+function openStaffDialog(userId) {
+  const form = $('#form-staff');
+  form.reset(); showError(form, '');
+  const s = state.staff.find(x => x.user_id === userId);
+  const u = state.users.find(x => x.id === userId);
+  form.user.value = userId || '';
+  $('#dlg-staff-title').textContent = userId ? `Rechten van ${u?.display_name || s?.display_name || 'beheerder'}` : 'Beheerder toevoegen';
+  $('#staff-pick').hidden = !!userId;
+  $('#staff-who').innerHTML = userId ? `<div class="list-item">${avatar(u || { display_name: s?.display_name, username: s?.username })}<div class="who-block"><span class="t">${esc(u?.display_name || s?.display_name)}</span><span class="s">@${esc(u?.username || s?.username)}</span></div></div>` : '';
+  $('#staff-search').value = '';
+  drawStaffPick();
+  const role = s?.role && ROLES[s.role] ? s.role : 'moderator';
+  form.role.value = role;
+  $('#staff-perms').innerHTML = PERMS.map(([k, l, d]) => `
+    <label class="perm-opt"><input type="checkbox" name="perm" value="${k}"><span><b>${esc(l)}</b><small>${esc(d)}</small></span></label>`).join('');
+  setPermBoxes(s ? s.perms : ROLES[role].perms);
+  $('#dlg-staff').showModal();
+  (userId ? form.role : $('#staff-search')).focus();
+}
+
+function setPermBoxes(perms) {
+  $$('#staff-perms input').forEach(i => { i.checked = perms.includes(i.value); });
+  updateRoleNote();
+}
+function updateRoleNote() {
+  const form = $('#form-staff');
+  const perms = $$('#staff-perms input:checked').map(i => i.value);
+  $('#staff-role-note').textContent = isCustomised(form.role.value, perms) ? `${ROLE_LABEL(form.role.value)}, met jouw aanpassingen` : ROLES[form.role.value]?.desc || '';
+}
+
+function drawStaffPick() {
+  const form = $('#form-staff');
+  const q = $('#staff-search').value.trim().toLowerCase();
+  const pool = state.users.filter(u => !u.is_admin && !u.is_blocked && u.username !== state.me?.username &&
+    (!q || u.username.toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)));
+  $('#staff-results').innerHTML = pool.slice(0, 6).map(u => `
+    <label class="pick-opt"><input type="radio" name="pick" value="${esc(u.id)}" ${form.user.value === u.id ? 'checked' : ''}>
+      ${avatar(u)}<span class="who-block"><span class="t">${esc(u.display_name)}</span><span class="s">@${esc(u.username)}</span></span></label>`).join('')
+    || '<p class="empty">Niemand gevonden. De persoon moet eerst een Spark Account hebben.</p>';
+}
+
+$('#staff-search').addEventListener('input', drawStaffPick);
+$('#staff-results').addEventListener('change', e => { if (e.target.name === 'pick') $('#form-staff').user.value = e.target.value; });
+$('#form-staff').role.addEventListener('change', e => setPermBoxes(ROLES[e.target.value].perms));
+$('#staff-perms').addEventListener('change', updateRoleNote);
+
+$('#form-staff').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const userId = form.user.value;
+  const perms = $$('#staff-perms input:checked').map(i => i.value);
+  if (!userId) return showError(form, 'Kies eerst wie beheerder wordt.');
+  if (!perms.length) return showError(form, 'Zet minstens één vinkje aan.');
+  const u = state.users.find(x => x.id === userId);
+  await busy($('button[type=submit]', form), async () => {
+    try {
+      await api.setStaff(userId, form.role.value, perms);
+      $('#dlg-staff').close();
+      toast(`${u ? '@' + u.username : 'Beheerder'} opgeslagen`);
+      $('#dlg-user')?.close();
+      route();
+    } catch (err) { showError(form, err.message); }
+  });
+});
 
 // =============================================================
 //  MELDINGEN
@@ -1235,6 +1502,36 @@ document.addEventListener('click', async e => {
     case 'view-user':
       openUserDialog(state.users.find(u => u.id === id));
       break;
+
+    case 'req-filter': state.reqFilter = value; drawRequests($('#view')); break;
+    case 'req-kind': state.reqKind = value; drawRequests($('#view')); break;
+    case 'req-open': {
+      if (!state.requests.some(r => r.id === id)) state.requests = await api.listRequests();
+      openRequestDialog(state.requests.find(r => r.id === id));
+      break;
+    }
+    case 'req-delete': {
+      const form = $('#form-req');
+      const r = state.requests.find(x => x.id === form.dataset.id);
+      $('#dlg-req').close();
+      if (!await confirmDialog('Deze aanvraag verwijderen?', `"${r.title}" verdwijnt ook bij de afzender. Wil je hem liever afsluiten? Zet de status dan op Klaar of Afgewezen.`, 'Verwijderen')) return;
+      try { await api.deleteRequest(r.id); toast('Verwijderd'); route(); } catch (err) { toast(err.message, true); }
+      break;
+    }
+
+    case 'staff-add':
+      openStaffDialog(null);
+      break;
+    case 'staff-edit':
+      if (!state.staff.length) try { state.staff = await api.listStaff(); } catch { /* */ }
+      openStaffDialog(id);
+      break;
+    case 'staff-remove': {
+      const s = state.staff.find(x => x.user_id === id);
+      if (!await confirmDialog(`@${s.username} als beheerder weghalen?`, 'Het account blijft gewoon bestaan, alleen de toegang tot Beheer verdwijnt.', 'Weghalen')) return;
+      try { await api.removeStaff(id); toast(`@${s.username} is geen beheerder meer`); route(); } catch (err) { toast(err.message, true); }
+      break;
+    }
 
     case 'block': {
       const u = state.users.find(x => x.id === id);
