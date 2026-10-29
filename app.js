@@ -234,6 +234,7 @@ async function enterApp() {
   $('#me-name').innerHTML = esc('@' + (state.me?.username || 'beheerder')) +
     (state.access.role ? ` <span class="pill pill-role">${esc(ROLE_LABEL(state.access.role))}</span>` : '');
   $$('.nav a').forEach(a => { a.hidden = !can(VIEW_PERM[a.dataset.route]); });
+  $$('.nav-sec').forEach(sec => { sec.hidden = !$$('a', sec).some(a => !a.hidden); });
   if (!location.hash) history.replaceState(null, '', '#overzicht');
   route();
 }

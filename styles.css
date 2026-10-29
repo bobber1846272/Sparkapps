@@ -130,6 +130,11 @@ input[type="file"] { font: inherit; font-size: 14px; }
 .nav a:hover { background: #161B26; color: #fff; }
 .nav a[aria-current="page"] { background: var(--side-2); color: #fff; font-weight: 500; }
 .nav .count { font-size: 12px; background: #262D3D; color: var(--side-text); padding: 1px 8px; border-radius: 999px; }
+.nav .count:empty { display: none; }
+.nav { flex: 1; }
+.nav-sec { display: flex; flex-direction: column; gap: 3px; margin-top: 18px; }
+.nav-sec.nav-bottom { margin-top: auto; padding-top: 18px; }
+.nav-group { padding: 0 12px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--side-muted); }
 .side-foot { margin-top: auto; border-top: 1px solid #262D3D; padding: 16px 6px 0; display: flex; flex-direction: column; gap: 4px; }
 .side-foot .who { font-weight: 500; }
 .side-foot .lbl { font-size: 13px; color: var(--side-muted); }
@@ -264,6 +269,10 @@ dialog.dlg-wide { width: min(820px, calc(100vw - 24px)); }
   .nav { flex-direction: row; overflow-x: auto; gap: 4px; }
   .nav a { flex: none; padding: 9px 12px; }
   .nav .count { display: none; }
+  .nav { flex: none; }
+  .nav-sec, .nav-sec.nav-bottom { display: contents; }
+  .nav-sec[hidden] { display: none; }
+  .nav-group { display: none; }
   .side-foot { margin-top: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-top: 12px; }
   .side-foot .lbl { display: none; }
   .mode-pill { margin-top: 0; }
@@ -313,3 +322,9 @@ td.perm-col .no { color: var(--muted); }
 .req-meta { display: flex; flex-direction: column; gap: 10px; }
 .req-body { white-space: pre-wrap; background: var(--bg, #f6f7f9); border-radius: 12px; padding: 12px 14px; font-size: 15px; line-height: 1.5; }
 .req-device { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* Zijbalk blijft staan en past in het scherm; Beheer onderaan */
+@media (min-width: 801px) {
+  .side { position: sticky; top: 0; height: 100vh; align-self: flex-start; overflow-y: auto; gap: 22px; }
+  .nav a { padding-top: 8px; padding-bottom: 8px; }
+}
